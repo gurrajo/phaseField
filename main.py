@@ -2,6 +2,7 @@ from pystencils.session import *
 import shapefile
 import pandas as pd
 import fiona
+import ezdxf
 
 
 def init(value=0.5, noise=0.02):
@@ -74,23 +75,15 @@ x = np.linspace(0,255,256)
 cs = plt.contour(field,levels=[0.5])
 plt.savefig(ident+'contour_plot.png')
 a = cs.collections[0].get_paths()
-schema = {
-    'geometry':'Polygon',
-    'properties':[('Name','str')]
-}
-polyShp = fiona.open(ident+'Poly.shp', mode='w', driver='ESRI Shapefile', schema=schema, crs = "EPSG:4326")
-for i, cnt in enumerate(a):
-    xylist = cnt.vertices.tolist()
-    rowName = i
-    rowDict = {
-        'geometry': {'type': 'Polygon', 'coordinates': [xylist]},  # Here the xyList is in brackets
-        'properties': {'Name': "Poly"+str(rowName)},
-    }
-    print(i)
-    polyShp.write(rowDict)
 
-# close fiona object
-polyShp.close()
+
+
+#doc = ezdxf.new(setup=True)
+#msp = doc.modelspace()
+#for i,cnt in enumerate(a):
+#    points = cnt.vertices.tolist()
+#    msp.add_lwpolyline(points)
+#doc.saveas("lwpolyline.dxf")
 
 #plt.show()
 
