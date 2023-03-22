@@ -1,0 +1,57 @@
+import os
+import re
+import Phase
+
+def change_material(phase_1, phase_2, test_nr):
+    with open(f'nastran_input/micro_struc_hm_stress_out.bdf', 'r') as file:
+        # read a list of lines into data
+        data = file.readlines()
+    next_line = False
+    for i, line in enumerate(data):
+        if i == 15438:
+            print(line)
+        if next_line == "Mat_1":
+            data[i] = (f'MAT1           {phase_1.E}           {phase_1.nu} \n')
+            print(1)
+        elif next_line == "Mat_2":
+            data[i] = (f'MAT1           {phase_2.E}           {phase_2.nu} \n')
+            print(2)
+
+        if re.findall("HWCOLOR MAT                   7       5", line):  # Find pattern that starts with "pts_time:"
+            next_line = "Mat_1"
+        elif re.findall("HWCOLOR MAT                   8       5", line):
+            next_line = "Mat_2"
+        else:
+            next_line = False
+    with open(f'nastran_input/micro_struc_hm_tension{test_nr}.bdf', mode='w') as file:
+        file.writelines(data)
+
+
+def change_load():
+    with open(f'nastran_input/micro_struc_hm_stress_out.bdf', 'r') as file:
+        # read a list of lines into data
+        data = file.readlines()
+    next_line = False
+    for i, line in enumerate(data):
+        if next_line:
+            data[i] = ("+              1     1.0     0.0     0.0\n")
+
+        if re.findall("PLOAD4         2", line):  # Find pattern that starts with "pts_time:"
+            next_line = True
+        else:
+            next_line = False
+    with open(f'nastran_input/micro_struc_hm_tension.bdf', mode='w') as file:
+        file.writelines(data)
+
+
+E_1 = 100.001
+nu_1 = 0.3501
+
+E_2 = 200.001
+nu_2 = 0.3901
+
+phase_1 = Phase.PhaseMat(E_1, nu_1)
+phase_2 = Phase.PhaseMat(E_2, nu_2)
+change_material(phase_1, phase_2, 1)
+#change_load()
+
