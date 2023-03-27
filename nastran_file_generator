@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import re
 import Phase
@@ -36,7 +37,7 @@ def change_load():
         if next_line:
             data[i] = ("+              1     1.0     0.0     0.0\n")
 
-        if re.findall("PLOAD4         2", line):  # Find pattern that starts with "pts_time:"
+        if re.findall("PLOAD4         2", line):  # Find pattern
             next_line = True
         else:
             next_line = False
@@ -44,14 +45,54 @@ def change_load():
         file.writelines(data)
 
 
+def read_disp(file_name):
+    with open(f'nastran_input/{file_name}.f06', 'r') as file:
+        in_data = file.readlines()
+    disp_flag = False
+    out_data = []
+    in_data_iter = iter(in_data)
+    for line in in_data_iter:
+        if line[0] == '1':
+            disp_flag = False
+        if re.findall(" \*\*\*", line):
+            print(1)
+            disp_flag = False
+        if disp_flag:
+            out_data.append(line)
+        if re.findall("                                             D I S P L A C E M E N T   V E C T O R", line):
+            disp_flag = True
+            next(in_data_iter)
+            next(in_data_iter)
+    data = np.ndarray((86, 7))
+    for i, s in enumerate(out_data):
+        s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+        data[i] = [float(val) for val in s_out]
+    return data
+
+
+def calculate_compliance(file_name):
+    L = 255  # initial length
+    p = -1/L  # pressure
+
+    disp_data = read_disp(file_name)
+    y_disp = np.mean(disp_data[0:-1, 2])  # mean might not be best
+    eps = (L-y_disp)/L
+    D_22 = eps/p
+    return D_22
+
 E_1 = 100.001
 nu_1 = 0.3501
 
 E_2 = 200.001
 nu_2 = 0.3901
+file_name = "micro_struc_hm_set_test"
+#output_files = os.system(f'C:\Program^ Files\MSC.Software\MSC_Nastran\\2021.3\\bin\\nastranw.exe nastran_input\\{file_name}.bdf')
+
+D_22 = calculate_compliance(file_name)
+
 
 phase_1 = Phase.PhaseMat(E_1, nu_1)
 phase_2 = Phase.PhaseMat(E_2, nu_2)
-change_material(phase_1, phase_2, 1)
+#change_material(phase_1, phase_2, 1)
 #change_load()
 
