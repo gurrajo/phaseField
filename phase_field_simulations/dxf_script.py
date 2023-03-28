@@ -1,5 +1,5 @@
 import ezdxf
-import _file_reader as fr
+from nastran_scripts import _file_reader as fr
 
 lines = fr.file_reader("myfile.txt")
 # hatch requires the DXF R2000 or later

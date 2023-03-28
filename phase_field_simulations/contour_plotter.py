@@ -1,4 +1,4 @@
-import _file_reader as fr
+from nastran_scripts import _file_reader as fr
 import matplotlib.pyplot as plt
 import numpy as np
 

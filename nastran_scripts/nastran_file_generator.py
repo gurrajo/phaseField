@@ -1,5 +1,4 @@
 import numpy as np
-import os
 import re
 import Phase
 
@@ -24,7 +23,7 @@ def change_material(phase_1, phase_2, test_nr):
             next_line = "Mat_2"
         else:
             next_line = False
-    with open(f'nastran_input/micro_struc_hm_tension{test_nr}.bdf', mode='w') as file:
+    with open(f'nastran_scripts/nastran_input/micro_struc_hm_tension{test_nr}.bdf', mode='w') as file:
         file.writelines(data)
 
 
@@ -41,12 +40,12 @@ def change_load():
             next_line = True
         else:
             next_line = False
-    with open(f'nastran_input/micro_struc_hm_tension.bdf', mode='w') as file:
+    with open(f'nastran_scripts/nastran_input/micro_struc_hm_tension.bdf', mode='w') as file:
         file.writelines(data)
 
 
 def read_disp(file_name):
-    with open(f'nastran_input/{file_name}.f06', 'r') as file:
+    with open(f'nastran_scripts/nastran_input/{file_name}.f06', 'r') as file:
         in_data = file.readlines()
     disp_flag = False
     out_data = []
@@ -55,7 +54,6 @@ def read_disp(file_name):
         if line[0] == '1':
             disp_flag = False
         if re.findall(" \*\*\*", line):
-            print(1)
             disp_flag = False
         if disp_flag:
             out_data.append(line)
