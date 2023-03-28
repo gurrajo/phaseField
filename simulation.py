@@ -3,6 +3,7 @@ import shapefile
 import pandas as pd
 import fiona
 import ezdxf
+import numpy
 
 
 def init(value=0.5, noise=0.02):
@@ -75,15 +76,18 @@ x = np.linspace(0,255,256)
 cs = plt.contour(field,levels=[0.5])
 plt.savefig(ident+'contour_plot.png')
 a = cs.collections[0].get_paths()
+f = open("myfile.txt", 'w')
 
 
+for i,cnt in enumerate(a):
+    points = cnt.vertices.tolist()
+    for point in points:
+        f.write(str(point)+"#")
+    f.write("\n")
+f.close()
+# msp.add_lwpolyline(points)}}
+#doc.saveas("Hatch_test.dxf")
 
-#doc = ezdxf.new(setup=True)
-#msp = doc.modelspace()
-#for i,cnt in enumerate(a):
-#    points = cnt.vertices.tolist()
-#    msp.add_lwpolyline(points)
-#doc.saveas("lwpolyline.dxf")
 
 #plt.show()
 
