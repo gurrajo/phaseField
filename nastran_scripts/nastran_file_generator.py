@@ -66,6 +66,36 @@ def read_grid_data(filename):
     return out_data
 
 
+def linear_shear_displacement(file_name, grid_data):
+    """
+    creates linear pure shear strain condition
+    :param file_name: name of file in nastran_input folder to edit
+    :param grid_data: node, x, and y values
+    :return: writes a new bdf file with linearly increasing load
+    """
+    with open(f'nastran_input/{file_name}.bdf', 'r') as file:
+        in_data = file.readlines()
+    for i, line in enumerate(in_data):
+        if re.findall("SPCD           ", line):
+            node = int(line[16:24])
+            ind = np.where(grid_data[:, 0] == node)
+            x = grid_data[ind, 1]
+            y = grid_data[ind, 2]
+            spcd_x = 5.1 * y[0, 0] / 255
+            spcd_y = 5.1 * x[0, 0] / 255
+            spcd_x_string = "%.5f" % spcd_x
+            spcd_x_string = list(spcd_x_string)
+            spcd_x_string.insert(0, " ")
+            spcd_x_string = "".join(spcd_x_string)
+            node_string = list(str(node))
+            while len(node_string) < 8:
+                node_string.insert(0, " ")
+            node_string = "".join(node_string)
+            in_data[i] = f"SPCD           2{node_string}       1{spcd_x_string}\n"
+    with open(f'nastran_input/{file_name}_linear_shear.bdf', mode='w') as file:
+        file.writelines(in_data)
+
+
 def linear_displacement(file_name, grid_data, direc):
     """
 
@@ -99,7 +129,7 @@ def linear_displacement(file_name, grid_data, direc):
                 node_string.insert(0, " ")
             node_string = "".join(node_string)
             in_data[i] = f"SPCD           2{node_string}       {direc_val}{spcd_string}\n"
-    with open(f'nastran_input/{file_name}_linear_y.bdf', mode='w') as file:
+    with open(f'nastran_input/{file_name}_linear_{direc}.bdf', mode='w') as file:
         file.writelines(in_data)
 
 
@@ -335,10 +365,11 @@ nu_2 = 0.3901
 file_name = "micro_struc_hm_current_test_new_load"
 
 grid_data = read_grid_data(file_name)
-#e_node_tri = tri_element_nodes(file_name)
-#e_area_tri = tri_element_area(grid_data, e_node_tri)
+e_node_tri = tri_element_nodes(file_name)
+e_area_tri = tri_element_area(grid_data, e_node_tri)
 e_node_quad = quad_element_nodes(file_name)
 e_area_quad = quad_element_area(grid_data, e_node_quad)
+
 #linear_displacement(file_name, data, "y")
 #reac_data = read_reac_force(file_name)
 #grid_bound = np.zeros((len(reac_data), 3))
