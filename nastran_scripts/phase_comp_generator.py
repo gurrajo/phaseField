@@ -33,17 +33,20 @@ def comp_mats(sample):
     return E_1,E_2,nu_1,nu_2
 
 
-n = 1000
-d = 5
-hyperCube = hyper_cube(n,d)
-E_1 = []
-E_2 = []
-nu_1 = []
-nu_2 = []
+def phaseinator():
+    n = 1000
+    d = 5
+    hyperCube = hyper_cube(n,d)
+    E_1 = []
+    E_2 = []
+    nu_1 = []
+    nu_2 = []
 
-for i, samples in enumerate(hyperCube):
-    E_1_temp, E_2_temp, nu_1_temp, nu_2_temp = comp_mats(samples)
-    E_1.append(E_1_temp)
-    E_2.append(E_2_temp)
-    nu_1.append(nu_1_temp)
-    nu_2.append(nu_2_temp)
+    for i, samples in enumerate(hyperCube):
+        E_1_temp, E_2_temp, nu_1_temp, nu_2_temp = comp_mats(samples)
+        E_1.append(E_1_temp)
+        E_2.append(E_2_temp)
+        nu_1.append(nu_1_temp)
+        nu_2.append(nu_2_temp)
+
+    return E_1, E_2, nu_1, nu_2

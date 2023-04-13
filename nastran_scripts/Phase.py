@@ -23,6 +23,7 @@ class Micro:
         self.linear_displacement(grid_data, "y")
 
     def change_material(self):
+        # for isotropic material right now
         with open(f'nastran_input/{self.start_file}.bdf', 'r') as file:
             # read a list of lines into data
             data = file.readlines()

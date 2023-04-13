@@ -33,7 +33,8 @@ def read_grid_data(filename):
     :param filename:
     :return: point ID, x, y
     """
-    with open(f'nastran_input/{file_name}.bdf', 'r') as file:
+    #
+    with open(f'nastran_scripts/nastran_input/{file_name}.bdf', 'r') as file:
         in_data = file.readlines()
     disp_flag = False
     out_data = np.ndarray((7247, 3))
@@ -216,30 +217,142 @@ def read_disp(file_name):
     return data
 
 
+def quad_element_nodes(file_name):
+    """
+    create element node matrix, each row contains element index and 4 corresponding node index
+    :param file_name:
+    :return:
+    """
+    #
+    with open(f'nastran_scripts/nastran_input/{file_name}.bdf', 'r') as file:
+        in_data = file.readlines()
+    data_flag = False
+    out_data = []
+    in_data_iter = iter(in_data)
+    for line in in_data_iter:
+        if re.findall("\$", line):
+            data_flag = False
+        if data_flag:
+            out_data.append(line)
+        if re.findall("\$\$  CQUAD4 Elements", line):
+            data_flag = True
+            next(in_data_iter)
+    e_node = np.ndarray((len(out_data), 5))
+    for i, s in enumerate(out_data):
+        s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+        data = [float(val) for val in s_out]
+        e_node[i] = [data[1], data[3], data[4], data[5], data[6]]
+    return e_node
+
+
+def tri_element_nodes(file_name):
+    """
+    create element node matrix, each row contains element index and 3 corresponding node index
+    :param file_name:
+    :return:
+    """
+    with open(f'nastran_scripts/nastran_input/{file_name}.bdf', 'r') as file:
+        in_data = file.readlines()
+    data_flag = False
+    out_data = []
+    in_data_iter = iter(in_data)
+    for line in in_data_iter:
+        if re.findall("\$\$", line):
+            data_flag = False
+        if data_flag:
+            out_data.append(line)
+        if re.findall("\$\$  CTRIA3 Data", line):
+            data_flag = True
+            next(in_data_iter)
+    e_node = np.ndarray((len(out_data), 4))
+    for i, s in enumerate(out_data):
+        s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+        data = [float(val) for val in s_out]
+        e_node[i] = [data[1], data[3], data[4], data[5]]
+    return e_node
+
+
+def tri_element_area(grid_data, e_node):
+    """
+    Calcualte area of triangular elements
+    :param grid_data: node x, and y data
+    :param e_node: matrix with, element index, and 3 node index
+    :return: e_area: element index, element area
+    """
+    e_area = np.ndarray((len(e_node), 2))
+    for i, ele in enumerate(e_node):
+        node_1 = np.where(grid_data[:, 0] == ele[1])
+        node_2 = np.where(grid_data[:, 0] == ele[2])
+        node_3 = np.where(grid_data[:, 0] == ele[3])
+        M = np.ndarray((3,3))
+        M[0] = [grid_data[node_1, 1], grid_data[node_1, 2], 1]
+        M[1] = [grid_data[node_2, 1], grid_data[node_2, 2], 1]
+        M[2] = [grid_data[node_3, 1], grid_data[node_3, 2], 1]
+        area = 0.5*np.linalg.det(M)
+        e_area[i] = [ele[0], area]
+    return e_area
+
+
+def quad_element_area(grid_data, e_node):
+    """
+    Calcualte area of triangular elements
+    :param grid_data: node x, and y data
+    :param e_node: matrix with, element index, and 3 node index
+    :return: e_area: element index, element area
+    """
+    e_area = np.ndarray((len(e_node), 2))
+    for i, ele in enumerate(e_node):
+        node_1 = np.where(grid_data[:, 0] == ele[1])
+        node_2 = np.where(grid_data[:, 0] == ele[2])
+        node_3 = np.where(grid_data[:, 0] == ele[3])
+        node_4 = np.where(grid_data[:, 0] == ele[4])
+
+        M_1 = np.ndarray((2, 2))
+        M_2 = np.ndarray((2, 2))
+        M_3 = np.ndarray((2, 2))
+        M_4 = np.ndarray((2, 2))
+
+        M_1[0] = [grid_data[node_1, 1], grid_data[node_2, 1]]
+        M_1[1] = [grid_data[node_1, 2], grid_data[node_2, 2]]
+
+        M_2[0] = [grid_data[node_2, 1], grid_data[node_3, 1]]
+        M_2[1] = [grid_data[node_2, 2], grid_data[node_3, 2]]
+
+        M_3[0] = [grid_data[node_3, 1], grid_data[node_4, 1]]
+        M_3[1] = [grid_data[node_3, 2], grid_data[node_4, 2]]
+
+        M_4[0] = [grid_data[node_4, 1], grid_data[node_1, 1]]
+        M_4[1] = [grid_data[node_4, 2], grid_data[node_1, 2]]
+        area = 0.5*(np.linalg.det(M_1) + np.linalg.det(M_2) + np.linalg.det(M_3) + np.linalg.det(M_4))
+        e_area[i] = [ele[0], area]
+    return e_area
+
 E_1 = 100.001
 nu_1 = 0.3501
 
 E_2 = 200.001
 nu_2 = 0.3901
-file_name = "spcd_x_4_linear_y"
+file_name = "micro_struc_hm_current_test_new_load"
+
 grid_data = read_grid_data(file_name)
+#e_node_tri = tri_element_nodes(file_name)
+#e_area_tri = tri_element_area(grid_data, e_node_tri)
+e_node_quad = quad_element_nodes(file_name)
+e_area_quad = quad_element_area(grid_data, e_node_quad)
 #linear_displacement(file_name, data, "y")
-reac_data = read_reac_force(file_name)
-grid_bound = np.zeros((len(reac_data), 3))
-i = 0
+#reac_data = read_reac_force(file_name)
+#grid_bound = np.zeros((len(reac_data), 3))
+#i = 0
 # determine grid nodes
-for node in grid_data:
-    if node[0] in reac_data[:, 0]:
-        grid_bound[i] = node
-        i += 1
-(x_reac, y_reac, x_tick, y_tick) = normal_force(reac_data, grid_bound)
-E_22 = [x_reac, y_reac, 0]
+#for node in grid_data:
+#    if node[0] in reac_data[:, 0]:
+#        grid_bound[i] = node
+#        i += 1
+#(x_reac, y_reac, x_tick, y_tick) = normal_force(reac_data, grid_bound)
+#E_22 = [x_reac, y_reac, 0]
 #output_files = os.system(f'C:\Program^ Files\MSC.Software\MSC_Nastran\\2021.3\\bin\\nastranw.exe nastran_input\\{file_name}.bdf')
 
 #D_22 = calculate_compliance(file_name)
 
-
-phase_1 = Phase.PhaseMat(E_1, nu_1)
-phase_2 = Phase.PhaseMat(E_2, nu_2)
 #change_material(phase_1, phase_2, 1)
 #change_load()
