@@ -6,36 +6,53 @@ class PhaseMat:
     """
     Object representing a phase of a material
     """
-    def __init__(self, E, nu):
-        self.E = E
-        self.nu = nu
+    def __init__(self, E_1, E_2, nu_12, G_12):
+        self.E_1 = list("%.6f" % E_1)
+        while len(self.E_1) > 8:
+            self.E_1.pop(-1)
+        self.E_1 = "".join(self.E_1)
+
+        self.E_2 = list("%.6f" % E_2)
+        while len(self.E_2) > 8:
+            self.E_2.pop(-1)
+        self.E_2 = "".join(self.E_2)
+
+        self.nu_12 = list("%.6f" % nu_12)
+        while len(self.nu_12) > 8:
+            self.nu_12.pop(-1)
+        self.nu_12 = "".join(self.nu_12)
+
+        self.G_12 = list("%.6f" % G_12)
+        while len(self.G_12) > 8:
+            self.G_12.pop(-1)
+        self.G_12 = "".join(self.G_12)
 
 
 class Micro:
-    def __init__(self, E_1, nu_1, E_2, nu_2, test_nr, grid_data):
+    def __init__(self, phase_1, phase_2, test_nr, grid_data):
         self.grid_data = grid_data
-        self.start_file = "spcd_xy"
-        self.phase_1 = PhaseMat(E_1, nu_1)
-        self.phase_2 = PhaseMat(E_2, nu_2)
+        self.start_file = "2_orth_stress_out"
+        self.phase_1 = phase_1
+        self.phase_2 = phase_2
         self.test_nr = test_nr
         self.change_material()
-        self.linear_displacement(grid_data, "x")
-        self.linear_displacement(grid_data, "y")
+        #self.linear_displacement(grid_data, "x")
+        #self.linear_displacement(grid_data, "y")
 
     def change_material(self):
-        # for isotropic material right now
+        # for orthotropic materials
         with open(f'nastran_input/{self.start_file}.bdf', 'r') as file:
             # read a list of lines into data
             data = file.readlines()
         next_line = False
         for i, line in enumerate(data):
             if next_line == "Mat_1":
-                data[i] = (f'MAT1           {self.phase_1.E}           {self.phase_1.nu} \n')
+                data[i] = (f'MAT8           9{self.phase_1.E_1}{self.phase_1.E_2}{self.phase_1.nu_12}{self.phase_1.G_12}1.0     1.0             \n')
             elif next_line == "Mat_2":
-                data[i] = (f'MAT1           {self.phase_2.E}           {self.phase_2.nu} \n')
-            if re.findall("HWCOLOR MAT                   7       5", line):  # Find pattern that starts with "pts_time:"
+                data[i] = (f'MAT8          10{self.phase_2.E_1}{self.phase_2.E_2}{self.phase_2.nu_12}{self.phase_2.G_12}1.0     1.0             \n')
+            if re.findall("HWCOLOR MAT                   9       4", line):  # Find pattern that starts with "pts_time:"
                 next_line = "Mat_1"
-            elif re.findall("HWCOLOR MAT                   8       5", line):
+            elif re.findall("HWCOLOR MAT                  10       5", line):
                 next_line = "Mat_2"
             else:
                 next_line = False
