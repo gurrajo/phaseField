@@ -12,15 +12,15 @@ def change_material(phase_1, phase_2, test_nr):
         if i == 15438:
             print(line)
         if next_line == "Mat_1":
-            data[i] = (f'MAT1           {phase_1.E}           {phase_1.nu} \n')
+            data[i] = (f'MAT8           9{phase_1.E_1}50.0    0.35    40.0    1.0     1.0\n')
             print(1)
         elif next_line == "Mat_2":
             data[i] = (f'MAT1           {phase_2.E}           {phase_2.nu} \n')
             print(2)
 
-        if re.findall("HWCOLOR MAT                   7       5", line):  # Find pattern that starts with "pts_time:"
+        if re.findall("\$HWCOLOR MAT                   9       4", line):  # Find pattern that starts with "pts_time:"
             next_line = "Mat_1"
-        elif re.findall("HWCOLOR MAT                   8       5", line):
+        elif re.findall("\$HWCOLOR MAT                   10       5", line):
             next_line = "Mat_2"
         else:
             next_line = False
@@ -28,13 +28,63 @@ def change_material(phase_1, phase_2, test_nr):
         file.writelines(data)
 
 
-def read_grid_data(filename):
+def read_el_stress(file_name, n_el):
+    with open(f'nastran_input/{file_name}.f06', 'r') as file:
+        in_data = file.readlines()
+    disp_flag = False
+    out_data = []
+    in_data_iter = iter(in_data)
+    for line in in_data_iter:
+        if line[0] == '1':
+            disp_flag = False
+        if re.findall(" \*\*\*", line):
+            disp_flag = False
+        if disp_flag:
+            out_data.append(line)
+            next(in_data_iter)  # skip duplicate
+        if re.findall("  ELEMENT      FIBER               STRESSES IN ELEMENT COORD SYSTEM             PRINCIPAL STRESSES", line):
+            disp_flag = True
+            next(in_data_iter)
+    data = np.ndarray((n_el, 4))
+    for i, s in enumerate(out_data):
+        s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+        nums = [float(val) for val in s_out]
+        data[i] = [nums[1], nums[3], nums[4], nums[5]]
+    return data
+
+
+def read_el_strain(file_name, n_el):
+    with open(f'nastran_input/{file_name}.f06', 'r') as file:
+        in_data = file.readlines()
+    disp_flag = False
+    out_data = []
+    in_data_iter = iter(in_data)
+    for line in in_data_iter:
+        if line[0] == '1':
+            disp_flag = False
+        if re.findall(" \*\*\*", line):
+            disp_flag = False
+        if disp_flag:
+            out_data.append(line)
+            next(in_data_iter)  # skip duplicate
+        if re.findall("  ELEMENT      STRAIN               STRAINS IN ELEMENT COORD SYSTEM             PRINCIPAL  STRAINS", line):
+            disp_flag = True
+            next(in_data_iter)
+    data = np.ndarray((n_el, 4))
+    for i, s in enumerate(out_data):
+        s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+        nums = [float(val) for val in s_out]
+        data[i] = [nums[1], nums[3], nums[4], nums[5]]
+    return data
+
+
+def read_grid_data(file_name):
     """
     :param filename:
     :return: point ID, x, y
     """
     #
-    with open(f'nastran_scripts/nastran_input/{file_name}.bdf', 'r') as file:
+    with open(f'nastran_input/{file_name}.bdf', 'r') as file:
         in_data = file.readlines()
     disp_flag = False
     out_data = np.ndarray((7247, 3))
@@ -77,21 +127,28 @@ def linear_shear_displacement(file_name, grid_data):
         in_data = file.readlines()
     for i, line in enumerate(in_data):
         if re.findall("SPCD           ", line):
+            direc = int(line[24:32])
             node = int(line[16:24])
             ind = np.where(grid_data[:, 0] == node)
-            x = grid_data[ind, 1]
-            y = grid_data[ind, 2]
-            spcd_x = 5.1 * y[0, 0] / 255
-            spcd_y = 5.1 * x[0, 0] / 255
-            spcd_x_string = "%.5f" % spcd_x
-            spcd_x_string = list(spcd_x_string)
-            spcd_x_string.insert(0, " ")
-            spcd_x_string = "".join(spcd_x_string)
+            if direc == 1:
+                val = grid_data[ind, 2]
+
+            elif direc == 2:
+                val = grid_data[ind, 1]
+            else:
+                print("fail")
+            spcd = 5.1 * val[0, 0] / 255
+            spcd_string = "%.5f" % spcd
+            spcd_string = list(spcd_string)
+            while len(spcd_string) > 7:
+                spcd_string.pop(-1)
+            spcd_string.insert(0, " ")
+            spcd_string = "".join(spcd_string)
             node_string = list(str(node))
             while len(node_string) < 8:
                 node_string.insert(0, " ")
             node_string = "".join(node_string)
-            in_data[i] = f"SPCD           2{node_string}       1{spcd_x_string}\n"
+            in_data[i] = f"SPCD           2{node_string}       {direc}{spcd_string}\n"
     with open(f'nastran_input/{file_name}_linear_shear.bdf', mode='w') as file:
         file.writelines(in_data)
 
@@ -122,6 +179,8 @@ def linear_displacement(file_name, grid_data, direc):
                 return
             spcd_string = "%.5f" % spcd
             spcd_string = list(spcd_string)
+            while len(spcd_string) > 7:
+                spcd_string.pop(-1)
             spcd_string.insert(0, " ")
             spcd_string = "".join(spcd_string)
             node_string = list(str(node))
@@ -254,7 +313,7 @@ def quad_element_nodes(file_name):
     :return:
     """
     #
-    with open(f'nastran_scripts/nastran_input/{file_name}.bdf', 'r') as file:
+    with open(f'nastran_input/{file_name}.bdf', 'r') as file:
         in_data = file.readlines()
     data_flag = False
     out_data = []
@@ -281,7 +340,7 @@ def tri_element_nodes(file_name):
     :param file_name:
     :return:
     """
-    with open(f'nastran_scripts/nastran_input/{file_name}.bdf', 'r') as file:
+    with open(f'nastran_input/{file_name}.bdf', 'r') as file:
         in_data = file.readlines()
     data_flag = False
     out_data = []
@@ -323,6 +382,28 @@ def tri_element_area(grid_data, e_node):
     return e_area
 
 
+def vol_avg_stress(e_area, e_stress):
+    tot_area = 255 * 255
+    tot_stress = [0,0,0]
+    for e_s in e_stress:
+        el_area = e_area[np.where(e_area[:, 0] == e_s[0]), 1]
+        for i in range(3):
+            tot_stress[i] += el_area*e_s[i+1]
+    avg_stress = [s/tot_area for s in tot_stress]
+    return avg_stress
+
+
+def vol_avg_strain(e_area, e_strain):
+    tot_area = 255 * 255
+    tot_strain = [0, 0, 0]
+    for e_s in e_strain:
+        el_area = e_area[np.where(e_area[:, 0] == e_s[0]), 1]
+        for i in range(3):
+            tot_strain[i] += el_area*e_s[i+1]
+    avg_strain = [s/tot_area for s in tot_strain]
+    return avg_strain
+
+
 def quad_element_area(grid_data, e_node):
     """
     Calcualte area of triangular elements
@@ -357,18 +438,18 @@ def quad_element_area(grid_data, e_node):
         e_area[i] = [ele[0], area]
     return e_area
 
-E_1 = 100.001
-nu_1 = 0.3501
-
-E_2 = 200.001
-nu_2 = 0.3901
-file_name = "micro_struc_hm_current_test_new_load"
-
-grid_data = read_grid_data(file_name)
-e_node_tri = tri_element_nodes(file_name)
-e_area_tri = tri_element_area(grid_data, e_node_tri)
-e_node_quad = quad_element_nodes(file_name)
-e_area_quad = quad_element_area(grid_data, e_node_quad)
+# E_1 = 100.001
+# nu_1 = 0.3501
+#
+# E_2 = 200.001
+# nu_2 = 0.3901
+# file_name = "micro_struc_hm_current_test_new_load"
+#
+# grid_data = read_grid_data(file_name)
+# e_node_tri = tri_element_nodes(file_name)
+# e_area_tri = tri_element_area(grid_data, e_node_tri)
+# e_node_quad = quad_element_nodes(file_name)
+# e_area_quad = quad_element_area(grid_data, e_node_quad)
 
 #linear_displacement(file_name, data, "y")
 #reac_data = read_reac_force(file_name)
