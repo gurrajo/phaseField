@@ -120,11 +120,12 @@ class Micro:
     def calc_elast_mat(self):
         # use symbolic math
         # TODO
-        E_1 = self.stress_x[0] * 0.02
+        self.stress_x[0] = E_1/(1-nu_12**2)
+        self.stress_x[1] = nu_12*E_1/(1-nu_12**2)
         E_2 = self.stress_y[0] * 0.02
         nu_12 = self.stress_x[1] * 0.02  # fix
         G_12 = self.stress_xy[0] * 0.02
-        C = 0
+        C = [E_1, E_2, nu_12, G_12]
         return C
 
     def elast_bounds(self):
