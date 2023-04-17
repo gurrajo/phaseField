@@ -29,19 +29,29 @@ class PhaseMat:
 
 
 class Micro:
-    def __init__(self, phase_1, phase_2, test_nr, grid_data):
+    def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
         self.grid_data = grid_data
-        self.start_file = "2_orth_stress_out"
+        self.e_area = e_area
+        self.n_el = len(e_area)  # number of elements
+        # 3 start files, one for each load case
+        self.start_file_x = "2_orth_stress_out"
+        self.start_file_y = "2_orth_stress_out"
+        self.start_file_xy = "shear_orig"
         self.phase_1 = phase_1
         self.phase_2 = phase_2
         self.test_nr = test_nr
-        self.change_material()
-        #self.linear_displacement(grid_data, "x")
-        #self.linear_displacement(grid_data, "y")
+        self.change_material(self.start_file_x)
+        self.change_material(self.start_file_y)
+        self.change_material(self.start_file_xy)
+        self.run_nastran()  # generate f06 file for each load case
+        self.stress_x = self.calc_stress(self.start_file_x)
+        self.stress_y = self.calc_stress(self.start_file_y)
+        self.stress_xy = self.calc_stress(self.start_file_xy)
+        self.C = self.calc_elast_mat()
 
-    def change_material(self):
+    def change_material(self, start_file):
         # for orthotropic materials
-        with open(f'nastran_input/{self.start_file}.bdf', 'r') as file:
+        with open(f'nastran_input/{start_file}.bdf', 'r') as file:
             # read a list of lines into data
             data = file.readlines()
         next_line = False
@@ -56,41 +66,61 @@ class Micro:
                 next_line = "Mat_2"
             else:
                 next_line = False
-        with open(f'nastran_output/material{self.test_nr}.bdf', mode='w') as file:
+        with open(f'nastran_output/{start_file}_{self.test_nr}.bdf', mode='w') as file:
             file.writelines(data)
 
-    def linear_displacement(self, grid_data, direc):
+    def run_nastran(self):
+        print(1)
+        # call os with start file x and self.test_nr
+        # call os with start file y and self.test_nr
+        # call os with start file xy and self.test_nr
+
+    def calc_stress(self, start_file):
+        e_stress = self.ele_stress(start_file)
+        tot_area = 255 * 255
+        tot_stress = [0, 0, 0]
+        for e_s in e_stress:
+            el_area = self.e_area[np.where(self.e_area[:, 0] == e_s[0]), 1]
+            for i in range(3):
+                tot_stress[i] += el_area * e_s[i + 1]
+        avg_stress = [s / tot_area for s in tot_stress]
+        return avg_stress
+
+    def ele_stress(self, start_file):
+        with open(f'nastran_output/{start_file}_{self.test_nr}.f06', 'r') as file:
+            in_data = file.readlines()
+        disp_flag = False
+        out_data = []
+        in_data_iter = iter(in_data)
+        for line in in_data_iter:
+            if line[0] == '1':
+                disp_flag = False
+            if re.findall(" \*\*\*", line):
+                disp_flag = False
+            if disp_flag:
+                out_data.append(line)
+                next(in_data_iter)  # skip duplicate
+            if re.findall(
+                    "  ELEMENT      FIBER               STRESSES IN ELEMENT COORD SYSTEM             PRINCIPAL STRESSES",
+                    line):
+                disp_flag = True
+                next(in_data_iter)
+        data = np.ndarray((self.n_el, 4))
+        for i, s in enumerate(out_data):
+            s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+            nums = [float(val) for val in s_out]
+            data[i] = [nums[1], nums[3], nums[4], nums[5]]
+        return data
+
+    def calc_elast_mat(self):
+        # use symbolic math
+        # TODO
+        print(1)
+
+    def elast_bounds(self):
         """
-        writes a new bdf file with linearly increasing load in direc direction
-        :param grid_data: node, x, and y values
-        :param direc: load direction
+        calculate lower Reuss value and upprt Voigt value for the representative elasticity parameters
         :return:
         """
-        with open(f'nastran_output/material{self.test_nr}.bdf', 'r') as file:
-            in_data = file.readlines()
-        for i, line in enumerate(in_data):
-            if re.findall("SPCD           ", line):
-                node = int(line[16:24])
-                ind = np.where(grid_data[:, 0] == node)
-                x = grid_data[ind, 1]
-                y = grid_data[ind, 2]
-                if direc == "x":
-                    direc_val = 1
-                    spcd = 5.1 * x[0, 0] / 255
-                elif direc == "y":
-                    direc_val = 2
-                    spcd = 5.1 * y[0, 0] / 255
-                else:
-                    print("no load direction stated")
-                    return
-                spcd_string = "%.5f" % spcd
-                spcd_string = list(spcd_string)
-                spcd_string.insert(0, " ")
-                spcd_string = "".join(spcd_string)
-                node_string = list(str(node))
-                while len(node_string) < 8:
-                    node_string.insert(0, " ")
-                node_string = "".join(node_string)
-                in_data[i] = f"SPCD           2{node_string}       {direc_val}{spcd_string}\n"
-        with open(f'nastran_output/linear{direc}_{self.test_nr}.bdf', mode='w') as file:
-            file.writelines(in_data)
+
+
