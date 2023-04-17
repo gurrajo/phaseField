@@ -1,5 +1,6 @@
 import re
 import numpy as np
+import sympy as sm
 
 
 class PhaseMat:
@@ -27,9 +28,13 @@ class PhaseMat:
             self.G_12.pop(-1)
         self.G_12 = "".join(self.G_12)
 
+        self.C = np.ndarray((1, 4))
+        self.C[0] = [E_1, E_2, nu_12, G_12]
+
 
 class Micro:
     def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
+        self.vol_frac = 0.5
         self.grid_data = grid_data
         self.e_area = e_area
         self.n_el = len(e_area)  # number of elements
@@ -115,12 +120,18 @@ class Micro:
     def calc_elast_mat(self):
         # use symbolic math
         # TODO
-        print(1)
+        E_1 = self.stress_x[0] * 0.02
+        E_2 = self.stress_y[0] * 0.02
+        nu_12 = self.stress_x[1] * 0.02  # fix
+        G_12 = self.stress_xy[0] * 0.02
+        C = 0
+        return C
 
     def elast_bounds(self):
         """
-        calculate lower Reuss value and upprt Voigt value for the representative elasticity parameters
-        :return:
+        calculate lower Reuss value and upper Voigt value for the representative elasticity parameters
         """
+        C_voigt = self.vol_frac*self.phase_1.C + (1-self.vol_frac)*self.phase_2.C
+        C_reuss = np.linalg.inv(self.vol_frac/self.phase_1.C + (1-self.vol_frac)/self.phase_2.C)
 
-
+        return C_voigt, C_reuss
