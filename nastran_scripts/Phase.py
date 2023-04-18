@@ -1,12 +1,17 @@
 import re
 import numpy as np
 import sympy as sm
+import subprocess
+import scipy
+from scipy import optimize
+import time
 
 
 class PhaseMat:
     """
     Object representing a phase of a material
     """
+
     def __init__(self, E_1, E_2, nu_12, G_12):
         self.E_1 = list("%.6f" % E_1)
         while len(self.E_1) > 8:
@@ -39,9 +44,9 @@ class Micro:
         self.e_area = e_area
         self.n_el = len(e_area)  # number of elements
         # 3 start files, one for each load case
-        self.start_file_x = "2_orth_stress_out"
-        self.start_file_y = "2_orth_stress_out"
-        self.start_file_xy = "shear_orig"
+        self.start_file_x = "x_orig_eps1"
+        self.start_file_y = "y_orig_eps1"
+        self.start_file_xy = "xy_orig_eps01"
         self.phase_1 = phase_1
         self.phase_2 = phase_2
         self.test_nr = test_nr
@@ -49,6 +54,8 @@ class Micro:
         self.change_material(self.start_file_y)
         self.change_material(self.start_file_xy)
         self.run_nastran()  # generate f06 file for each load case
+
+    def calc_stresses(self):
         self.stress_x = self.calc_stress(self.start_file_x)
         self.stress_y = self.calc_stress(self.start_file_y)
         self.stress_xy = self.calc_stress(self.start_file_xy)
@@ -62,12 +69,14 @@ class Micro:
         next_line = False
         for i, line in enumerate(data):
             if next_line == "Mat_1":
-                data[i] = (f'MAT8           9{self.phase_1.E_1}{self.phase_1.E_2}{self.phase_1.nu_12}{self.phase_1.G_12}1.0     1.0             \n')
+                data[i] = (
+                    f'MAT8           1{self.phase_1.E_1}{self.phase_1.E_2}{self.phase_1.nu_12}{self.phase_1.G_12}1.0     1.0             \n')
             elif next_line == "Mat_2":
-                data[i] = (f'MAT8          10{self.phase_2.E_1}{self.phase_2.E_2}{self.phase_2.nu_12}{self.phase_2.G_12}1.0     1.0             \n')
-            if re.findall("HWCOLOR MAT                   9       4", line):  # Find pattern that starts with "pts_time:"
+                data[i] = (
+                    f'MAT8           2{self.phase_2.E_1}{self.phase_2.E_2}{self.phase_2.nu_12}{self.phase_2.G_12}1.0     1.0             \n')
+            if re.findall("HWCOLOR MAT                   1       4", line):  # Find pattern that starts with "pts_time:"
                 next_line = "Mat_1"
-            elif re.findall("HWCOLOR MAT                  10       5", line):
+            elif re.findall("HWCOLOR MAT                   2       5", line):
                 next_line = "Mat_2"
             else:
                 next_line = False
@@ -75,10 +84,20 @@ class Micro:
             file.writelines(data)
 
     def run_nastran(self):
-        print(1)
+        """
+        run the generated .bdf files in nastran MSC
+        """
         # call os with start file x and self.test_nr
+        p1 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
+                             f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_x}_{self.test_nr}.bdf'])
+
         # call os with start file y and self.test_nr
+        p2 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
+                             f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_y}_{self.test_nr}.bdf'])
+
         # call os with start file xy and self.test_nr
+        p3 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
+                             f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_xy}_{self.test_nr}.bdf'])
 
     def calc_stress(self, start_file):
         e_stress = self.ele_stress(start_file)
@@ -92,7 +111,7 @@ class Micro:
         return avg_stress
 
     def ele_stress(self, start_file):
-        with open(f'nastran_output/{start_file}_{self.test_nr}.f06', 'r') as file:
+        with open(f'{start_file}_{self.test_nr}.f06', 'r') as file:
             in_data = file.readlines()
         disp_flag = False
         out_data = []
@@ -118,13 +137,13 @@ class Micro:
         return data
 
     def calc_elast_mat(self):
-        # use symbolic math
-        # TODO
-        self.stress_x[0] = E_1/(1-nu_12**2)
-        self.stress_x[1] = nu_12*E_1/(1-nu_12**2)
-        E_2 = self.stress_y[0] * 0.02
-        nu_12 = self.stress_x[1] * 0.02  # fix
-        G_12 = self.stress_xy[0] * 0.02
+        lm_func_x = lambda nu: (nu ** 2 + nu) - (self.stress_x[0][0] / self.stress_x[1][0])
+        nu_12 = scipy.optimize.fsolve(lm_func_x, 2)
+        lm_func_y = lambda nu: (nu ** 2 + nu) - (self.stress_y[1][0] / self.stress_y[0][0])
+        nu_12_y = scipy.optimize.fsolve(lm_func_y, 2)
+        E_1 = self.stress_x[0][0]*(1 - nu_12 ** 2)
+        E_2 = (1 - nu_12 ** 2)*self.stress_y[1][0]
+        G_12 = self.stress_xy[2][0]/0.1
         C = [E_1, E_2, nu_12, G_12]
         return C
 
@@ -132,7 +151,7 @@ class Micro:
         """
         calculate lower Reuss value and upper Voigt value for the representative elasticity parameters
         """
-        C_voigt = self.vol_frac*self.phase_1.C + (1-self.vol_frac)*self.phase_2.C
-        C_reuss = np.linalg.inv(self.vol_frac/self.phase_1.C + (1-self.vol_frac)/self.phase_2.C)
+        C_voigt = self.vol_frac * self.phase_1.C + (1 - self.vol_frac) * self.phase_2.C
+        C_reuss = np.linalg.inv(self.vol_frac / self.phase_1.C + (1 - self.vol_frac) / self.phase_2.C)
 
         return C_voigt, C_reuss
