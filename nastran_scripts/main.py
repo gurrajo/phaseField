@@ -15,7 +15,9 @@ e_node_quad = nas_gen.quad_element_nodes(orig_file_name)
 e_area_quad = nas_gen.quad_element_area(grid_data, e_node_quad)  # area for each quadrilateral element
 e_area = np.append(e_area_quad, e_area_tri, 0)
 nel = len(e_area)
-
+e_node_2 = np.append(e_node_quad[:, 0:3], e_node_tri[:, 0:3], 0)
+stress_data = nas_gen.read_el_stress('y_orig_1', nel)
+nas_gen.rotate_stress_field(stress_data, grid_data, e_node_2)
 # from a material sample (2 phases) generate a Micro object
 test_nr = 1
 E_1 = 60

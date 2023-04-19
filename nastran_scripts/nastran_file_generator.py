@@ -54,7 +54,7 @@ def read_el_stress(file_name, n_el):
 
 
 def read_el_strain(file_name, n_el):
-    with open(f'nastran_input/{file_name}.f06', 'r') as file:
+    with open(f'nastran_output/{file_name}.f06', 'r') as file:
         in_data = file.readlines()
     disp_flag = False
     out_data = []
@@ -433,6 +433,34 @@ def quad_element_area(grid_data, e_node):
         e_area[i] = [ele[0], area]
     return e_area
 
+
+def rotate_stress_field(stress_data, grid_data, el_nodes):
+    new_stress_vec = np.zeros((len(el_nodes), 4))
+    for i, el_stress in enumerate(stress_data):
+        nodes = el_nodes[np.where(el_nodes[:, 0] == el_stress[0])]
+        temp = np.where(grid_data[:, 0] == nodes[0, 1])
+        xy_node_1 = grid_data[np.where(grid_data[:, 0] == nodes[0, 1])]
+        xy_node_2 = grid_data[np.where(grid_data[:, 0] == nodes[0, 2])]
+        x_hat = np.zeros((1, 2))
+        x_hat[0, 0] = xy_node_2[0,0] - xy_node_1[0,0]
+        x_hat[0, 1] = xy_node_2[0,1] - xy_node_1[0,1]
+        x_hat = x_hat/np.linalg.norm(x_hat)
+        x = np.ndarray((1,2))
+        x[0] = [1,0]
+        rot_mat = np.zeros((2,2))
+        temp = rot_mat[0,0]
+        rot_mat[0,0] = np.vdot(x,x_hat)
+        rot_mat[0,1] = -np.linalg.norm(np.cross(x,x_hat))
+        rot_mat[1,1] = np.vdot(x,x_hat)
+        rot_mat[1,0] = np.linalg.norm(np.cross(x,x_hat))
+        stress_mat = np.zeros((2,2))
+        stress_mat[0,0] = el_stress[1]
+        stress_mat[0,1] = el_stress[3]
+        stress_mat[1,0] = el_stress[3]
+        stress_mat[1,1] = el_stress[2]
+        new_stress_mat = np.matmul(np.matmul(rot_mat, stress_mat), np.transpose(rot_mat))
+        new_stress_vec[i,:] = [nodes[0,0], new_stress_mat[0,0], new_stress_mat[1,1], new_stress_mat[0,1]]
+        print(1)
 # E_1 = 100.001
 # nu_1 = 0.3501
 #
