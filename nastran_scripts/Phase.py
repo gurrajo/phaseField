@@ -57,14 +57,22 @@ class Micro:
         #self.change_material(self.start_file_xy)
         #self.run_nastran()  # generate f06 file for each load case
 
-    def calc_stresses(self):
-        self.stress_x = self.sort_forces(self.start_file_x)
-        #self.stress_x[0, 1] += 0.07
-        #self.stress_x[0, 0] += 0
-        self.stress_y = self.sort_forces(self.start_file_y)
-        #self.stress_y[0, 0] += 0
-        #self.stress_y[0, 1] -= 0.1
-        self.stress_xy = self.sort_forces(self.start_file_xy)
+    def calc_stresses(self, el_nodes):
+        e_stress_x = self.ele_stress(self.start_file_x)
+        e_stress_y = self.ele_stress(self.start_file_y)
+        e_stress_xy = self.ele_stress(self.start_file_xy)
+
+        stress_x = self.rotate_stress_field(e_stress_x, el_nodes)
+        stress_y = self.rotate_stress_field(e_stress_y, el_nodes)
+        stress_xy = self.rotate_stress_field(e_stress_xy, el_nodes)
+
+        self.stress_x = self.calc_stress(stress_x)
+        self.stress_y = self.calc_stress(stress_y)
+        self.stress_xy = self.calc_stress(stress_xy)
+
+        # self.stress_x = self.sort_forces(self.start_file_x)
+        # self.stress_y = self.sort_forces(self.start_file_y)
+        # self.stress_xy = self.sort_forces(self.start_file_xy)
         self.C = self.calc_elast_mat()
 
     def change_material(self, start_file):
@@ -105,15 +113,14 @@ class Micro:
         p3 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
                              f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_xy}_{self.test_nr}.bdf'])
 
-    def calc_stress(self, start_file):
-        e_stress = self.ele_stress(start_file)
+    def calc_stress(self, e_stress):
         tot_area = 255 * 255
-        tot_stress = [0, 0, 0]
+        tot_stress = np.zeros((1,3))
         for e_s in e_stress:
             el_area = self.e_area[np.where(self.e_area[:, 0] == e_s[0]), 1]
             for i in range(3):
-                tot_stress[i] += el_area * e_s[i + 1]
-        avg_stress = [s / tot_area for s in tot_stress]
+                tot_stress[0,i] += el_area * e_s[i + 1]
+        avg_stress = tot_stress/tot_area
         return avg_stress
 
     def read_reac_force(self, start_file):
@@ -191,7 +198,7 @@ class Micro:
         return stress
 
     def ele_stress(self, start_file):
-        with open(f'{start_file}_{self.test_nr}.f06', 'r') as file:
+        with open(f'nastran_sol/{start_file}_{self.test_nr}.f06', 'r') as file:
             in_data = file.readlines()
         disp_flag = False
         out_data = []
@@ -215,6 +222,35 @@ class Micro:
             nums = [float(val) for val in s_out]
             data[i] = [nums[1], nums[3], nums[4], nums[5]]
         return data
+
+    def rotate_stress_field(self, stress_data, el_nodes):
+        grid_data = self.grid_data
+        new_stress_vec = np.zeros((len(el_nodes), 4))
+        for i, el_stress in enumerate(stress_data):
+            nodes = el_nodes[np.where(el_nodes[:, 0] == el_stress[0])]
+            temp = np.where(grid_data[:, 0] == nodes[0, 1])
+            xy_node_1 = grid_data[np.where(grid_data[:, 0] == nodes[0, 1])]
+            xy_node_2 = grid_data[np.where(grid_data[:, 0] == nodes[0, 2])]
+            x_hat = np.zeros((1, 2))
+            x_hat[0, 0] = xy_node_2[0, 0] - xy_node_1[0, 0]
+            x_hat[0, 1] = xy_node_2[0, 1] - xy_node_1[0, 1]
+            x_hat = x_hat / np.linalg.norm(x_hat)
+            x = np.ndarray((1, 2))
+            x[0] = [1, 0]
+            rot_mat = np.zeros((2, 2))
+            temp = rot_mat[0, 0]
+            rot_mat[0, 0] = np.vdot(x, x_hat)
+            rot_mat[0, 1] = -np.linalg.norm(np.cross(x, x_hat))
+            rot_mat[1, 1] = np.vdot(x, x_hat)
+            rot_mat[1, 0] = np.linalg.norm(np.cross(x, x_hat))
+            stress_mat = np.zeros((2, 2))
+            stress_mat[0, 0] = el_stress[1]
+            stress_mat[0, 1] = el_stress[3]
+            stress_mat[1, 0] = el_stress[3]
+            stress_mat[1, 1] = el_stress[2]
+            new_stress_mat = np.matmul(np.matmul(rot_mat, stress_mat), np.transpose(rot_mat))
+            new_stress_vec[i, :] = [nodes[0, 0], new_stress_mat[0, 0], new_stress_mat[1, 1], new_stress_mat[0, 1]]
+        return new_stress_vec
 
     def calc_elast_mat(self):
         E_2 = (self.stress_y[0,1] - self.stress_y[0,0]*self.stress_x[0,1]/self.stress_x[0,0])/self.strain[0,1]

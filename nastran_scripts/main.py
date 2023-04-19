@@ -16,8 +16,6 @@ e_area_quad = nas_gen.quad_element_area(grid_data, e_node_quad)  # area for each
 e_area = np.append(e_area_quad, e_area_tri, 0)
 nel = len(e_area)
 e_node_2 = np.append(e_node_quad[:, 0:3], e_node_tri[:, 0:3], 0)
-stress_data = nas_gen.read_el_stress('y_orig_1', nel)
-nas_gen.rotate_stress_field(stress_data, grid_data, e_node_2)
 # from a material sample (2 phases) generate a Micro object
 test_nr = 1
 E_1 = 60
@@ -32,7 +30,7 @@ G_12 = 15
 phase_2 = Phase.PhaseMat(E_1, E_2, nu_2, G_12)
 micro_test = Phase.Micro(phase_1, phase_2, test_nr, grid_data, e_area)
 # time.sleep(10) # lets nastran complete its call
-micro_test.calc_stresses()
+micro_test.calc_stresses(e_node_2)
 # # Micro object changes material data and generates new bdf files
 # # Micro object runs bdf files in Nastran
 # # Micro object interperates f06 file, gets (area, and element stresses)

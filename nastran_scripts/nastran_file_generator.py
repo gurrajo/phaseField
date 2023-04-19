@@ -460,7 +460,7 @@ def rotate_stress_field(stress_data, grid_data, el_nodes):
         stress_mat[1,1] = el_stress[2]
         new_stress_mat = np.matmul(np.matmul(rot_mat, stress_mat), np.transpose(rot_mat))
         new_stress_vec[i,:] = [nodes[0,0], new_stress_mat[0,0], new_stress_mat[1,1], new_stress_mat[0,1]]
-        print(1)
+    return new_stress_vec
 # E_1 = 100.001
 # nu_1 = 0.3501
 #
