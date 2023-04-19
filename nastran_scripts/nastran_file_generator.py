@@ -233,53 +233,48 @@ def read_reac_force(file_name):
     return data
 
 
-def normal_force(reac_data, grid_data):
-    x_side = 0
-    y_side = 0
-    x_tick = 0
-    y_tick = 0
+def sort_forces(reac_data, grid_data):
+    top_side = np.zeros((1, 2))
+    bot_side = np.zeros((1, 2))
+    left_side = np.zeros((1, 2))
+    right_side = np.zeros((1, 2))
     for i, node in enumerate(reac_data[:, 0]):
         reac_x = reac_data[i, 1]
         reac_y = reac_data[i, 2]
-        if grid_data[i, 1] == 0:
-            if grid_data[i, 2] == 0:
-                x_side += -1*reac_x
-                y_side += -1*reac_y
-                x_tick += 1
-                y_tick += 1
+        grid_value = grid_data[np.where(grid_data[:, 0] == node)]
+        if grid_value[0, 1] == 0:
+            if grid_value[0, 2] == 0:
+                bot_side[0, 1] += reac_y
+                left_side[0, 0] += reac_x
                 # corner point
-            elif grid_data[i, 2] == 255:
-                x_side += -1*reac_x
-                y_side += reac_y
-                x_tick += 1
-                y_tick += 1
+            elif grid_value[0, 2] == 255:
+                left_side[0, 0] += reac_x
+                top_side[0, 1] += reac_y
                 # corner point
             else:
-                x_side += -1*reac_x
-                x_tick += 1
-        elif grid_data[i, 1] == 255:
-            if grid_data[i, 2] == 0:
-                x_side += reac_x
-                y_side += -1*reac_y
-                x_tick += 1
-                y_tick += 1
+                left_side[0, 0] += reac_x
+                left_side[0, 1] += reac_y
+        elif grid_value[0, 1] == 255:
+            if grid_value[0, 2] == 0:
+                right_side[0, 0] += reac_x
+                bot_side[0, 1] += reac_y
                 # corner point
-            elif grid_data[i, 2] == 255:
-                x_side += reac_x
-                y_side += reac_y
-                x_tick += 1
-                y_tick += 1
+            elif grid_value[0, 2] == 255:
+                right_side[0, 0] += reac_x
+                top_side[0, 1] += reac_y
                 # corner point
             else:
-                y_side += -1*reac_y
-                y_tick += 1
-        elif grid_data[i, 2] == 255:
-            y_side += reac_y
-            y_tick += 1
-        elif grid_data[i, 2] == 0:
-            x_side += reac_x
-            x_tick += 1
-    return x_side, y_side, x_tick, y_tick
+                right_side[0, 0] += reac_x
+                right_side[0, 1] += reac_y
+        elif grid_value[0, 2] == 255:
+            top_side[0, 0] += reac_x
+            top_side[0, 1] += reac_y
+        elif grid_value[0, 2] == 0:
+            bot_side[0, 0] += reac_x
+            bot_side[0, 1] += reac_y
+        else:
+            print("grid_value not on boundary")
+    return left_side, right_side, top_side, bot_side
 
 
 def read_disp(file_name):

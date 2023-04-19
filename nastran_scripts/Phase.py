@@ -39,26 +39,32 @@ class PhaseMat:
 
 class Micro:
     def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
+        self.strain = np.zeros((1,3))
+        self.strain[0] = [0.02, 0.02, 0.02]
         self.vol_frac = 0.5
         self.grid_data = grid_data
         self.e_area = e_area
         self.n_el = len(e_area)  # number of elements
         # 3 start files, one for each load case
-        self.start_file_x = "x_orig_eps1"
-        self.start_file_y = "y_orig_eps1"
-        self.start_file_xy = "xy_orig_eps01"
+        self.start_file_x = "x_orig"
+        self.start_file_y = "y_orig"
+        self.start_file_xy = "xy_orig"
         self.phase_1 = phase_1
         self.phase_2 = phase_2
         self.test_nr = test_nr
-        self.change_material(self.start_file_x)
-        self.change_material(self.start_file_y)
-        self.change_material(self.start_file_xy)
-        self.run_nastran()  # generate f06 file for each load case
+        #self.change_material(self.start_file_x)
+        #self.change_material(self.start_file_y)
+        #self.change_material(self.start_file_xy)
+        #self.run_nastran()  # generate f06 file for each load case
 
     def calc_stresses(self):
-        self.stress_x = self.calc_stress(self.start_file_x)
-        self.stress_y = self.calc_stress(self.start_file_y)
-        self.stress_xy = self.calc_stress(self.start_file_xy)
+        self.stress_x = self.sort_forces(self.start_file_x)
+        #self.stress_x[0, 1] += 0.07
+        #self.stress_x[0, 0] += 0
+        self.stress_y = self.sort_forces(self.start_file_y)
+        #self.stress_y[0, 0] += 0
+        #self.stress_y[0, 1] -= 0.1
+        self.stress_xy = self.sort_forces(self.start_file_xy)
         self.C = self.calc_elast_mat()
 
     def change_material(self, start_file):
@@ -110,6 +116,80 @@ class Micro:
         avg_stress = [s / tot_area for s in tot_stress]
         return avg_stress
 
+    def read_reac_force(self, start_file):
+        with open(f'nastran_sol/{start_file}_{self.test_nr}.f06', 'r') as file:
+            in_data = file.readlines()
+        disp_flag = False
+        out_data = []
+        in_data_iter = iter(in_data)
+        for line in in_data_iter:
+            if line[0] == '1':
+                disp_flag = False
+            if re.findall(" \*\*\*", line):
+                disp_flag = False
+            if disp_flag:
+                out_data.append(line)
+            if re.findall(
+                    "                               F O R C E S   O F   S I N G L E - P O I N T   C O N S T R A I N T",
+                    line):
+                disp_flag = True
+                next(in_data_iter)
+                next(in_data_iter)
+        data = np.ndarray((342, 7))
+        for i, s in enumerate(out_data):
+            s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
+            data[i] = [float(val) for val in s_out]
+        return data
+
+    def sort_forces(self, start_file):
+        reac_data = self.read_reac_force(start_file)
+        top_side = np.zeros((1, 2))
+        bot_side = np.zeros((1, 2))
+        left_side = np.zeros((1, 2))
+        right_side = np.zeros((1, 2))
+        for i, node in enumerate(reac_data[:, 0]):
+            reac_x = reac_data[i, 1]
+            reac_y = reac_data[i, 2]
+            grid_value = self.grid_data[np.where(self.grid_data[:, 0] == node)]
+            if grid_value[0, 1] == 0:
+                if grid_value[0, 2] == 0:
+                    bot_side[0, 1] += reac_y
+                    left_side[0, 0] += reac_x
+                    # corner point
+                elif grid_value[0, 2] == 255:
+                    left_side[0, 0] += reac_x
+                    top_side[0, 1] += reac_y
+                    # corner point
+                else:
+                    left_side[0, 0] += reac_x
+                    left_side[0, 1] += reac_y
+            elif grid_value[0, 1] == 255:
+                if grid_value[0, 2] == 0:
+                    right_side[0, 0] += reac_x
+                    bot_side[0, 1] += reac_y
+                    # corner point
+                elif grid_value[0, 2] == 255:
+                    right_side[0, 0] += reac_x
+                    top_side[0, 1] += reac_y
+                    # corner point
+                else:
+                    right_side[0, 0] += reac_x
+                    right_side[0, 1] += reac_y
+            elif grid_value[0, 2] == 255:
+                top_side[0, 0] += reac_x
+                top_side[0, 1] += reac_y
+            elif grid_value[0, 2] == 0:
+                bot_side[0, 0] += reac_x
+                bot_side[0, 1] += reac_y
+            else:
+                print("grid_value not on boundary")
+        stress_x = np.abs((left_side[0, 0] * -1 + right_side[0, 0]) / 2)/255
+        stress_y = np.abs((bot_side[0, 1] * -1 + top_side[0, 1]) / 2)/255
+        stress_xy = (np.abs((np.abs(bot_side[0, 0]) + np.abs(top_side[0, 0]) + np.abs(left_side[0, 1]) + np.abs(right_side[0, 1])) / 4))/255
+        stress = np.zeros((1, 3))
+        stress[0] = [stress_x, stress_y, stress_xy]
+        return stress
+
     def ele_stress(self, start_file):
         with open(f'{start_file}_{self.test_nr}.f06', 'r') as file:
             in_data = file.readlines()
@@ -137,13 +217,10 @@ class Micro:
         return data
 
     def calc_elast_mat(self):
-        lm_func_x = lambda nu: (nu ** 2 + nu) - (self.stress_x[0][0] / self.stress_x[1][0])
-        nu_12 = scipy.optimize.fsolve(lm_func_x, 2)
-        lm_func_y = lambda nu: (nu ** 2 + nu) - (self.stress_y[1][0] / self.stress_y[0][0])
-        nu_12_y = scipy.optimize.fsolve(lm_func_y, 2)
-        E_1 = self.stress_x[0][0]*(1 - nu_12 ** 2)
-        E_2 = (1 - nu_12 ** 2)*self.stress_y[1][0]
-        G_12 = self.stress_xy[2][0]/0.1
+        E_2 = (self.stress_y[0,1] - self.stress_y[0,0]*self.stress_x[0,1]/self.stress_x[0,0])/self.strain[0,1]
+        E_1 = (self.stress_x[0,0] - self.stress_y[0,0]*self.stress_x[0,1]/self.stress_y[0,1])/self.strain[0,0]
+        nu_12 = E_1*self.stress_x[0,1]/(E_2*self.stress_x[0,0])
+        G_12 = self.stress_xy[0,2]/self.strain[0, 2]
         C = [E_1, E_2, nu_12, G_12]
         return C
 
