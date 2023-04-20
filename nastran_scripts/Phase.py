@@ -5,6 +5,7 @@ import subprocess
 import scipy
 from scipy import optimize
 import time
+import os
 
 
 class PhaseMat:
@@ -46,25 +47,21 @@ class Micro:
         self.e_area = e_area
         self.n_el = len(e_area)  # number of elements
         # 3 start files, one for each load case
-        self.start_file_x = "x_orig"
-        self.start_file_y = "y_orig"
-        self.start_file_xy = "xy_orig"
+        self.start_file_x = "new_orig_x"
+        self.start_file_y = "new_orig_y"
+        self.start_file_xy = "new_orig_xy"
         self.phase_1 = phase_1
         self.phase_2 = phase_2
         self.test_nr = test_nr
-        #self.change_material(self.start_file_x)
-        #self.change_material(self.start_file_y)
-        #self.change_material(self.start_file_xy)
+        self.change_material(self.start_file_x)
+        self.change_material(self.start_file_y)
+        self.change_material(self.start_file_xy)
         #self.run_nastran()  # generate f06 file for each load case
 
     def calc_stresses(self, el_nodes):
-        e_stress_x = self.ele_stress(self.start_file_x)
-        e_stress_y = self.ele_stress(self.start_file_y)
-        e_stress_xy = self.ele_stress(self.start_file_xy)
-
-        stress_x = self.rotate_stress_field(e_stress_x, el_nodes)
-        stress_y = self.rotate_stress_field(e_stress_y, el_nodes)
-        stress_xy = self.rotate_stress_field(e_stress_xy, el_nodes)
+        stress_x = self.ele_stress(self.start_file_x)
+        stress_y = self.ele_stress(self.start_file_y)
+        stress_xy = self.ele_stress(self.start_file_xy)
 
         self.stress_x = self.calc_stress(stress_x)
         self.stress_y = self.calc_stress(stress_y)
@@ -100,11 +97,11 @@ class Micro:
     def run_nastran(self):
         """
         run the generated .bdf files in nastran MSC
+        Move generated .f06 file to \nastran_sol
         """
         # call os with start file x and self.test_nr
         p1 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
                              f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_x}_{self.test_nr}.bdf'])
-
         # call os with start file y and self.test_nr
         p2 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
                              f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_y}_{self.test_nr}.bdf'])
@@ -112,6 +109,12 @@ class Micro:
         # call os with start file xy and self.test_nr
         p3 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
                              f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_xy}_{self.test_nr}.bdf'])
+        time.sleep(30)
+        os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_x}_{self.test_nr}.f06", f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_x}_{self.test_nr}.f06")
+        os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_y}_{self.test_nr}.f06",
+                   f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_y}_{self.test_nr}.f06")
+        os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_xy}_{self.test_nr}.f06",
+                   f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_xy}_{self.test_nr}.f06")
 
     def calc_stress(self, e_stress):
         tot_area = 255 * 255
@@ -198,7 +201,7 @@ class Micro:
         return stress
 
     def ele_stress(self, start_file):
-        with open(f'nastran_sol/{start_file}_{self.test_nr}.f06', 'r') as file:
+        with open(f'nastran_sol\\{start_file}_{self.test_nr}.f06', 'r') as file:
             in_data = file.readlines()
         disp_flag = False
         out_data = []
@@ -212,7 +215,7 @@ class Micro:
                 out_data.append(line)
                 next(in_data_iter)  # skip duplicate
             if re.findall(
-                    "  ELEMENT      FIBER               STRESSES IN ELEMENT COORD SYSTEM             PRINCIPAL STRESSES",
+                    "  ELEMENT      FIBER               STRESSES IN MATERIAL COORD SYSTEM            PRINCIPAL STRESSES",
                     line):
                 disp_flag = True
                 next(in_data_iter)
@@ -228,21 +231,17 @@ class Micro:
         new_stress_vec = np.zeros((len(el_nodes), 4))
         for i, el_stress in enumerate(stress_data):
             nodes = el_nodes[np.where(el_nodes[:, 0] == el_stress[0])]
-            temp = np.where(grid_data[:, 0] == nodes[0, 1])
             xy_node_1 = grid_data[np.where(grid_data[:, 0] == nodes[0, 1])]
             xy_node_2 = grid_data[np.where(grid_data[:, 0] == nodes[0, 2])]
             x_hat = np.zeros((1, 2))
-            x_hat[0, 0] = xy_node_2[0, 0] - xy_node_1[0, 0]
-            x_hat[0, 1] = xy_node_2[0, 1] - xy_node_1[0, 1]
+            x_hat[0, 0] = xy_node_2[0, 1] - xy_node_1[0, 1]
+            x_hat[0, 1] = xy_node_2[0, 2] - xy_node_1[0, 2]
             x_hat = x_hat / np.linalg.norm(x_hat)
-            x = np.ndarray((1, 2))
-            x[0] = [1, 0]
             rot_mat = np.zeros((2, 2))
-            temp = rot_mat[0, 0]
-            rot_mat[0, 0] = np.vdot(x, x_hat)
-            rot_mat[0, 1] = -np.linalg.norm(np.cross(x, x_hat))
-            rot_mat[1, 1] = np.vdot(x, x_hat)
-            rot_mat[1, 0] = np.linalg.norm(np.cross(x, x_hat))
+            rot_mat[0, 0] = x_hat[0, 0]
+            rot_mat[0, 1] = -x_hat[0, 1]
+            rot_mat[1, 1] = x_hat[0, 0]
+            rot_mat[1, 0] = x_hat[0, 1]
             stress_mat = np.zeros((2, 2))
             stress_mat[0, 0] = el_stress[1]
             stress_mat[0, 1] = el_stress[3]
@@ -250,6 +249,8 @@ class Micro:
             stress_mat[1, 1] = el_stress[2]
             new_stress_mat = np.matmul(np.matmul(rot_mat, stress_mat), np.transpose(rot_mat))
             new_stress_vec[i, :] = [nodes[0, 0], new_stress_mat[0, 0], new_stress_mat[1, 1], new_stress_mat[0, 1]]
+        temp = np.max(new_stress_vec[:,1])
+        temp2 = np.max(new_stress_vec[:, 2])
         return new_stress_vec
 
     def calc_elast_mat(self):
