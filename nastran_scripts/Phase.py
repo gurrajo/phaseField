@@ -34,6 +34,13 @@ class PhaseMat:
             self.G_12.pop(-1)
         self.G_12 = "".join(self.G_12)
 
+        D = np.zeros((3, 3))
+        D[0,0] = 1/E_1
+        D[1,1] = 1/E_2
+        D[2,2] = 1/G_12
+        D[0,1] = -nu_12/E_1
+        D[1,0] = D[0,1]
+        self.D = D
         self.C = np.ndarray((1, 4))
         self.C[0] = [E_1, E_2, nu_12, G_12]
 
@@ -70,7 +77,7 @@ class Micro:
         # self.stress_x = self.sort_forces(self.start_file_x)
         # self.stress_y = self.sort_forces(self.start_file_y)
         # self.stress_xy = self.sort_forces(self.start_file_xy)
-        self.C = self.calc_elast_mat()
+        self.D = self.calc_comp_mat()
 
     def change_material(self, start_file):
         # for orthotropic materials
@@ -253,19 +260,62 @@ class Micro:
         temp2 = np.max(new_stress_vec[:, 2])
         return new_stress_vec
 
-    def calc_elast_mat(self):
-        E_2 = (self.stress_y[0,1] - self.stress_y[0,0]*self.stress_x[0,1]/self.stress_x[0,0])/self.strain[0,1]
-        E_1 = (self.stress_x[0,0] - self.stress_y[0,0]*self.stress_x[0,1]/self.stress_y[0,1])/self.strain[0,0]
-        nu_12 = E_1*self.stress_x[0,1]/(E_2*self.stress_x[0,0])
-        G_12 = self.stress_xy[0,2]/self.strain[0, 2]
-        C = [E_1, E_2, nu_12, G_12]
-        return C
+    def calc_comp_mat(self):
+        D = np.zeros((3,3))
+        D[0,0] = self.strain[0,0]/(self.stress_x[0,0]*(1-(self.stress_x[0,1]*self.stress_y[0,0])/(self.stress_x[0,0]*self.stress_y[0,1])))
+        D[0,1] = -D[0,0]*self.stress_y[0,0]/self.stress_y[0,1]
+        D[1,0] = D[0,1]
+        D[1,1] = self.strain[0,1]/self.stress_y[0,1] - D[0,1]*self.stress_y[0,0]/self.stress_y[0,1]
+        D[2,2] = np.sqrt(2)*self.strain[0,2]/self.stress_xy[0,2]
+        return D
 
     def elast_bounds(self):
         """
         calculate lower Reuss value and upper Voigt value for the representative elasticity parameters
         """
-        C_voigt = self.vol_frac * self.phase_1.C + (1 - self.vol_frac) * self.phase_2.C
-        C_reuss = np.linalg.inv(self.vol_frac / self.phase_1.C + (1 - self.vol_frac) / self.phase_2.C)
 
-        return C_voigt, C_reuss
+        sig_11 = -(self.phase_1.D[1,1])*self.vol_frac/(self.phase_1.D[0,1]**2 - self.phase_1.D[0,0]*self.phase_1.D[1,1]) - (1-self.vol_frac)*self.phase_2.D[1,1]/(self.phase_2.D[0,1]**2 - self.phase_2.D[0,0]*self.phase_2.D[1,1])
+        sig_12 = (self.phase_1.D[0,1])*self.vol_frac/(self.phase_1.D[0,1]**2 - self.phase_1.D[0,0]*self.phase_1.D[1,1]) + (1-self.vol_frac)*self.phase_2.D[0,1]/(self.phase_2.D[0,1]**2 - self.phase_2.D[0,0]*self.phase_2.D[1,1])
+        sig_22 = -(self.phase_1.D[0,0])*self.vol_frac/(self.phase_1.D[0,1]**2 - self.phase_1.D[0,0]*self.phase_1.D[1,1]) - (1-self.vol_frac)*self.phase_2.D[0,0]/(self.phase_2.D[0,1]**2 - self.phase_2.D[0,0]*self.phase_2.D[1,1])
+        D_voigt = np.zeros((3, 3))
+        D_voigt[0,0] = 1/sig_11 + ((sig_12**2)/(sig_22*sig_11**2) + (sig_12**4)/((sig_11*sig_22 + sig_12**2)*sig_22*sig_11**2))
+        D_voigt[1,1] = 1/sig_22 + (sig_12**2)/((sig_11*sig_22 + sig_12**2)*sig_22)
+        D_voigt[0,1] = -sig_12/(sig_11*sig_22 + sig_12**2)
+        D_voigt[1,0] = D_voigt[0,1]
+        D_voigt[2,2] = 1/(self.vol_frac/self.phase_1.D[2,2] + (1-self.vol_frac)/self.phase_2.D[2,2])
+
+        D_voigt_2 = np.zeros((3, 3))
+        D_voigt_2[0, 0] = 1 / (self.vol_frac / self.phase_1.D[0, 0] + (1 - self.vol_frac) / self.phase_2.D[0, 0])
+        D_voigt_2[0, 1] = 1 / (self.vol_frac / self.phase_1.D[0, 1] + (1 - self.vol_frac) / self.phase_2.D[0, 1])
+        D_voigt_2[1, 0] = D_voigt_2[0,1]
+        D_voigt_2[1, 1] = 1 / (self.vol_frac / self.phase_1.D[1, 1] + (1 - self.vol_frac) / self.phase_2.D[1, 1])
+        D_voigt_2[2, 2] = 1 / (self.vol_frac / self.phase_1.D[2, 2] + (1 - self.vol_frac) / self.phase_2.D[2, 2])
+
+        C_voigt = np.zeros((1,4))
+        C_voigt[0,0] = 1/D_voigt[0,0]
+        C_voigt[0,1] = 1/D_voigt[1,1]
+        C_voigt[0,3] = 1/D_voigt[2,2]
+        C_voigt[0,2] = -C_voigt[0,0]*D_voigt[0,1]
+
+        C_voigt_2 = np.zeros((1, 4))
+        C_voigt_2[0, 0] = 1 / D_voigt_2[0, 0]
+        C_voigt_2[0, 1] = 1 / D_voigt_2[1, 1]
+        C_voigt_2[0, 3] = 1 / D_voigt_2[2, 2]
+        C_voigt_2[0, 2] = -C_voigt_2[0, 0] * D_voigt_2[0, 1]
+
+        D_reuss = np.zeros((3,3))
+        D_reuss[0, 0] = self.vol_frac * self.phase_1.D[0, 0] + (1 - self.vol_frac) * self.phase_2.D[0, 0]
+        D_reuss[0, 1] = self.vol_frac * self.phase_1.D[0,1] + (1 - self.vol_frac) * self.phase_2.D[0, 1]
+        D_reuss[1, 0] = D_reuss[0, 1]
+        D_reuss[1, 1] = self.vol_frac * self.phase_1.D[1, 1] + (1 - self.vol_frac) * self.phase_2.D[1, 1]
+        D_reuss[2,2] = self.vol_frac*self.phase_1.D[2,2] + (1-self.vol_frac)*self.phase_2.D[2,2]
+
+        C_reuss = np.zeros((1, 4))
+        C_reuss[0, 0] = 1 / D_reuss[0, 0]
+        C_reuss[0, 1] = 1 / D_reuss[1, 1]
+        C_reuss[0, 3] = 1 / D_reuss[2, 2]
+        C_reuss[0, 2] = -C_reuss[0, 0] * D_reuss[0, 1]
+
+        self.D_voigt = D_voigt_2
+        self.D_reuss = D_reuss
+        return D_voigt, D_reuss
