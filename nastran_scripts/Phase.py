@@ -48,7 +48,7 @@ class PhaseMat:
 class Micro:
     def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
         self.strain = np.zeros((1,3))
-        self.strain[0] = [0.02, 0.02, 0.02]
+        self.strain[0] = [0.02, 0.02, np.arctan2(5.1, 255)]
         self.vol_frac = 0.5
         self.grid_data = grid_data
         self.e_area = e_area
@@ -78,6 +78,12 @@ class Micro:
         # self.stress_y = self.sort_forces(self.start_file_y)
         # self.stress_xy = self.sort_forces(self.start_file_xy)
         self.D = self.calc_comp_mat()
+        C = np.zeros((1,4))
+        C[0,0] = 1/self.D[0,0]
+        C[0,1] = 1/self.D[1,1]
+        C[0,2] = -C[0,1]*self.D[0,1]
+        C[0,3] = 1/self.D[2,2]
+        self.C = C
 
     def change_material(self, start_file):
         # for orthotropic materials
@@ -266,7 +272,7 @@ class Micro:
         D[0,1] = -D[0,0]*self.stress_y[0,0]/self.stress_y[0,1]
         D[1,0] = D[0,1]
         D[1,1] = self.strain[0,1]/self.stress_y[0,1] - D[0,1]*self.stress_y[0,0]/self.stress_y[0,1]
-        D[2,2] = np.sqrt(2)*self.strain[0,2]/self.stress_xy[0,2]
+        D[2,2] = 2*self.strain[0,2]/self.stress_xy[0,2]
         return D
 
     def elast_bounds(self):
@@ -308,7 +314,7 @@ class Micro:
         D_reuss[0, 1] = self.vol_frac * self.phase_1.D[0,1] + (1 - self.vol_frac) * self.phase_2.D[0, 1]
         D_reuss[1, 0] = D_reuss[0, 1]
         D_reuss[1, 1] = self.vol_frac * self.phase_1.D[1, 1] + (1 - self.vol_frac) * self.phase_2.D[1, 1]
-        D_reuss[2,2] = self.vol_frac*self.phase_1.D[2,2] + (1-self.vol_frac)*self.phase_2.D[2,2]
+        D_reuss[2, 2] = self.vol_frac*self.phase_1.D[2, 2] + (1-self.vol_frac)*self.phase_2.D[2,2]
 
         C_reuss = np.zeros((1, 4))
         C_reuss[0, 0] = 1 / D_reuss[0, 0]
