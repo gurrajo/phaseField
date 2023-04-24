@@ -1,6 +1,7 @@
 import re
 import numpy as np
 import sympy as sm
+from sympy.solvers import solve
 import subprocess
 import scipy
 from scipy import optimize
@@ -13,7 +14,12 @@ class PhaseMat:
     Object representing a phase of a material
     """
 
-    def __init__(self, E_1, E_2, nu_12, G_12):
+    def __init__(self, D):
+        E_1 = 1/D[0,0]
+        E_2 = 1/D[1,1]
+        nu_12 = -D[0,1]*E_1
+        G_12 = 1/(2*D[2,2])
+
         self.E_1 = list("%.6f" % E_1)
         while len(self.E_1) > 8:
             self.E_1.pop(-1)
@@ -34,12 +40,6 @@ class PhaseMat:
             self.G_12.pop(-1)
         self.G_12 = "".join(self.G_12)
 
-        D = np.zeros((3, 3))
-        D[0,0] = 1/E_1
-        D[1,1] = 1/E_2
-        D[2,2] = 1/G_12
-        D[0,1] = -nu_12/E_1
-        D[1,0] = D[0,1]
         self.D = D
         self.C = np.ndarray((1, 4))
         self.C[0] = [E_1, E_2, nu_12, G_12]
@@ -48,21 +48,21 @@ class PhaseMat:
 class Micro:
     def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
         self.strain = np.zeros((1,3))
-        self.strain[0] = [0.02, 0.02, np.arctan2(5.1, 255)]
+        self.strain[0] = [0.04, 0.04, 0.04]
         self.vol_frac = 0.5
         self.grid_data = grid_data
         self.e_area = e_area
         self.n_el = len(e_area)  # number of elements
         # 3 start files, one for each load case
-        self.start_file_x = "new_orig_x"
-        self.start_file_y = "new_orig_y"
-        self.start_file_xy = "new_orig_xy"
+        self.start_file_x = "new_orig_x_10.2"
+        self.start_file_y = "new_orig_y_10.2"
+        self.start_file_xy = "new_orig_xy_10.2"
         self.phase_1 = phase_1
         self.phase_2 = phase_2
         self.test_nr = test_nr
-        self.change_material(self.start_file_x)
-        self.change_material(self.start_file_y)
-        self.change_material(self.start_file_xy)
+        #self.change_material(self.start_file_x)
+        #self.change_material(self.start_file_y)
+        #self.change_material(self.start_file_xy)
         #self.run_nastran()  # generate f06 file for each load case
 
     def calc_stresses(self, el_nodes):
@@ -81,8 +81,8 @@ class Micro:
         C = np.zeros((1,4))
         C[0,0] = 1/self.D[0,0]
         C[0,1] = 1/self.D[1,1]
-        C[0,2] = -C[0,1]*self.D[0,1]
-        C[0,3] = 1/self.D[2,2]
+        C[0,2] = -C[0,0]*self.D[0,1]
+        C[0,3] = 1/(2*self.D[2,2])
         self.C = C
 
     def change_material(self, start_file):
@@ -94,13 +94,13 @@ class Micro:
         for i, line in enumerate(data):
             if next_line == "Mat_1":
                 data[i] = (
-                    f'MAT8           1{self.phase_1.E_1}{self.phase_1.E_2}{self.phase_1.nu_12}{self.phase_1.G_12}1.0     1.0             \n')
+                    f'MAT8           7{self.phase_1.E_1}{self.phase_1.E_2}{self.phase_1.nu_12}{self.phase_1.G_12}1.0     1.0             \n')
             elif next_line == "Mat_2":
                 data[i] = (
-                    f'MAT8           2{self.phase_2.E_1}{self.phase_2.E_2}{self.phase_2.nu_12}{self.phase_2.G_12}1.0     1.0             \n')
-            if re.findall("HWCOLOR MAT                   1       4", line):  # Find pattern that starts with "pts_time:"
+                    f'MAT8           8{self.phase_2.E_1}{self.phase_2.E_2}{self.phase_2.nu_12}{self.phase_2.G_12}1.0     1.0             \n')
+            if re.findall("HWCOLOR MAT                   7       9", line):  # Find pattern that starts with "pts_time:"
                 next_line = "Mat_1"
-            elif re.findall("HWCOLOR MAT                   2       5", line):
+            elif re.findall("HWCOLOR MAT                   8       8", line):
                 next_line = "Mat_2"
             else:
                 next_line = False
@@ -122,7 +122,8 @@ class Micro:
         # call os with start file xy and self.test_nr
         p3 = subprocess.call(['C:\\Program Files\\MSC.Software\\MSC_Nastran\\2021.3\\bin\\nastranw.exe',
                              f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_xy}_{self.test_nr}.bdf'])
-        time.sleep(30)
+
+    def move_f06_files(self):
         os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_x}_{self.test_nr}.f06", f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_x}_{self.test_nr}.f06")
         os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_y}_{self.test_nr}.f06",
                    f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_y}_{self.test_nr}.f06")
@@ -267,12 +268,18 @@ class Micro:
         return new_stress_vec
 
     def calc_comp_mat(self):
+        D = sm.symarray("D", (3,3))
+        eqs = []
+        eqs.extend(np.matmul(D, self.stress_x[0, :]) - [self.strain[0,0], 0, 0])
+        eqs.extend(np.matmul(D, self.stress_y[0, :])- [0, self.strain[0,1], 0])
+        eqs.extend(np.matmul(D, self.stress_xy[0, :])- [0, 0, self.strain[0,2]])
+        sol = solve(eqs)
         D = np.zeros((3,3))
         D[0,0] = self.strain[0,0]/(self.stress_x[0,0]*(1-(self.stress_x[0,1]*self.stress_y[0,0])/(self.stress_x[0,0]*self.stress_y[0,1])))
         D[0,1] = -D[0,0]*self.stress_y[0,0]/self.stress_y[0,1]
         D[1,0] = D[0,1]
         D[1,1] = self.strain[0,1]/self.stress_y[0,1] - D[0,1]*self.stress_y[0,0]/self.stress_y[0,1]
-        D[2,2] = 2*self.strain[0,2]/self.stress_xy[0,2]
+        D[2,2] = self.strain[0,2]/self.stress_xy[0,2]
         return D
 
     def elast_bounds(self):
@@ -280,48 +287,33 @@ class Micro:
         calculate lower Reuss value and upper Voigt value for the representative elasticity parameters
         """
 
-        sig_11 = -(self.phase_1.D[1,1])*self.vol_frac/(self.phase_1.D[0,1]**2 - self.phase_1.D[0,0]*self.phase_1.D[1,1]) - (1-self.vol_frac)*self.phase_2.D[1,1]/(self.phase_2.D[0,1]**2 - self.phase_2.D[0,0]*self.phase_2.D[1,1])
-        sig_12 = (self.phase_1.D[0,1])*self.vol_frac/(self.phase_1.D[0,1]**2 - self.phase_1.D[0,0]*self.phase_1.D[1,1]) + (1-self.vol_frac)*self.phase_2.D[0,1]/(self.phase_2.D[0,1]**2 - self.phase_2.D[0,0]*self.phase_2.D[1,1])
-        sig_22 = -(self.phase_1.D[0,0])*self.vol_frac/(self.phase_1.D[0,1]**2 - self.phase_1.D[0,0]*self.phase_1.D[1,1]) - (1-self.vol_frac)*self.phase_2.D[0,0]/(self.phase_2.D[0,1]**2 - self.phase_2.D[0,0]*self.phase_2.D[1,1])
         D_voigt = np.zeros((3, 3))
-        D_voigt[0,0] = 1/sig_11 + ((sig_12**2)/(sig_22*sig_11**2) + (sig_12**4)/((sig_11*sig_22 + sig_12**2)*sig_22*sig_11**2))
-        D_voigt[1,1] = 1/sig_22 + (sig_12**2)/((sig_11*sig_22 + sig_12**2)*sig_22)
-        D_voigt[0,1] = -sig_12/(sig_11*sig_22 + sig_12**2)
-        D_voigt[1,0] = D_voigt[0,1]
-        D_voigt[2,2] = 1/(self.vol_frac/self.phase_1.D[2,2] + (1-self.vol_frac)/self.phase_2.D[2,2])
+        D_voigt[0, 0] = 1 / (self.vol_frac / self.phase_1.D[0, 0] + (1 - self.vol_frac) / self.phase_2.D[0, 0])
+        D_voigt[0, 1] = 1 / (self.vol_frac / self.phase_1.D[0, 1] + (1 - self.vol_frac) / self.phase_2.D[0, 1])
+        D_voigt[1, 0] = D_voigt[0,1]
+        D_voigt[1, 1] = 1 / (self.vol_frac / self.phase_1.D[1, 1] + (1 - self.vol_frac) / self.phase_2.D[1, 1])
+        D_voigt[2, 2] = 1 / (self.vol_frac / self.phase_1.D[2, 2] + (1 - self.vol_frac) / self.phase_2.D[2, 2])
 
-        D_voigt_2 = np.zeros((3, 3))
-        D_voigt_2[0, 0] = 1 / (self.vol_frac / self.phase_1.D[0, 0] + (1 - self.vol_frac) / self.phase_2.D[0, 0])
-        D_voigt_2[0, 1] = 1 / (self.vol_frac / self.phase_1.D[0, 1] + (1 - self.vol_frac) / self.phase_2.D[0, 1])
-        D_voigt_2[1, 0] = D_voigt_2[0,1]
-        D_voigt_2[1, 1] = 1 / (self.vol_frac / self.phase_1.D[1, 1] + (1 - self.vol_frac) / self.phase_2.D[1, 1])
-        D_voigt_2[2, 2] = 1 / (self.vol_frac / self.phase_1.D[2, 2] + (1 - self.vol_frac) / self.phase_2.D[2, 2])
-
-        C_voigt = np.zeros((1,4))
-        C_voigt[0,0] = 1/D_voigt[0,0]
-        C_voigt[0,1] = 1/D_voigt[1,1]
-        C_voigt[0,3] = 1/D_voigt[2,2]
-        C_voigt[0,2] = -C_voigt[0,0]*D_voigt[0,1]
-
-        C_voigt_2 = np.zeros((1, 4))
-        C_voigt_2[0, 0] = 1 / D_voigt_2[0, 0]
-        C_voigt_2[0, 1] = 1 / D_voigt_2[1, 1]
-        C_voigt_2[0, 3] = 1 / D_voigt_2[2, 2]
-        C_voigt_2[0, 2] = -C_voigt_2[0, 0] * D_voigt_2[0, 1]
+        C_voigt = np.zeros((1, 4))
+        C_voigt[0, 0] = 1 / D_voigt[0, 0]
+        C_voigt[0, 1] = 1 / D_voigt[1, 1]
+        C_voigt[0, 3] = 1 / (2*D_voigt[2, 2])
+        C_voigt[0, 2] = -C_voigt[0, 0] * D_voigt[0, 1]
 
         D_reuss = np.zeros((3,3))
         D_reuss[0, 0] = self.vol_frac * self.phase_1.D[0, 0] + (1 - self.vol_frac) * self.phase_2.D[0, 0]
-        D_reuss[0, 1] = self.vol_frac * self.phase_1.D[0,1] + (1 - self.vol_frac) * self.phase_2.D[0, 1]
+        D_reuss[0, 1] = self.vol_frac * self.phase_1.D[0, 1] + (1 - self.vol_frac) * self.phase_2.D[0, 1]
         D_reuss[1, 0] = D_reuss[0, 1]
         D_reuss[1, 1] = self.vol_frac * self.phase_1.D[1, 1] + (1 - self.vol_frac) * self.phase_2.D[1, 1]
-        D_reuss[2, 2] = self.vol_frac*self.phase_1.D[2, 2] + (1-self.vol_frac)*self.phase_2.D[2,2]
+        D_reuss[2, 2] = self.vol_frac*self.phase_1.D[2, 2] + (1-self.vol_frac)*self.phase_2.D[2, 2]
 
         C_reuss = np.zeros((1, 4))
         C_reuss[0, 0] = 1 / D_reuss[0, 0]
         C_reuss[0, 1] = 1 / D_reuss[1, 1]
-        C_reuss[0, 3] = 1 / D_reuss[2, 2]
+        C_reuss[0, 3] = 1 / (2*D_reuss[2, 2])
         C_reuss[0, 2] = -C_reuss[0, 0] * D_reuss[0, 1]
 
-        self.D_voigt = D_voigt_2
+        self.D_voigt = D_voigt
+        self.C_voigt = C_voigt
         self.D_reuss = D_reuss
-        return D_voigt, D_reuss
+        self.C_reuss = C_reuss
