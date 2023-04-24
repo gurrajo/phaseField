@@ -2,10 +2,19 @@ import numpy as np
 import time
 import Phase
 import nastran_file_generator as nas_gen
+import phase_comp_generator as ph_gen
+
+# def write_dataset(micro_arr):
+#     data = str
+#     for micro in micro_arr:
+#         data.append(f"{micro.}\n")
+#     with open(f'nastran_output/data_set.txt', mode='w') as file:
+#         line = f"{micro}\n"
+#         file.writelines()
 orig_file_name = "new_orig_x"
 
 # generate material space with latin hypercube
-#(E_1, E_2, nu_1, nu_2) = ph_gen.phaseinator()
+(D_1, D_2) = ph_gen.phaseinator()
 
 # calculate pre-proc data from bdf original file
 grid_data = nas_gen.read_grid_data(orig_file_name)  # node position data
@@ -17,20 +26,31 @@ e_area = np.append(e_area_quad, e_area_tri, 0)
 nel = len(e_area)
 e_node_2 = np.append(e_node_quad[:, 0:3], e_node_tri[:, 0:3], 0)
 # from a material sample (2 phases) generate a Micro object
-test_nr = 1
-E_1 = 68
-E_2 = 80
-nu_2 = 0.35
-G_12 = 10
-phase_1 = Phase.PhaseMat(E_1, E_2, nu_2, G_12)
-E_1 = 50
-E_2 = 45
-nu_2 = 0.3
-G_12 = 30
-phase_2 = Phase.PhaseMat(E_1, E_2, nu_2, G_12)
-micro_test = Phase.Micro(phase_1, phase_2, test_nr, grid_data, e_area)
-micro_test.elast_bounds()
-micro_test.calc_stresses(e_node_2)
+
+# nas_gen.linear_displacement("new_orig_x", grid_data, "x", 10.2)
+# nas_gen.linear_displacement("new_orig_y", grid_data, "y", 10.2)
+# nas_gen.linear_shear_displacement("new_orig_xy", grid_data,  10.2)
+
+
+test_nr = 0
+micro_arr = []
+for i in range(10):
+    D1 = D_1[i]
+    D2 = D_2[i]
+    phase_1 = Phase.PhaseMat(D1)
+    phase_2 = Phase.PhaseMat(D2)
+    micro_arr.append(Phase.Micro(phase_1, phase_2, test_nr, grid_data, e_area))
+    micro_arr[i].elast_bounds()
+    test_nr += 1
+
+# for i in range(10):
+#     micro_arr[i].move_f06_files()
+
+for i in range(10):
+    micro_arr[i].calc_stresses(e_node_2)
+
+# micro_test.elast_bounds()
+# micro_test.calc_stresses(e_node_2)
 # # Micro object changes material data and generates new bdf files
 # # Micro object runs bdf files in Nastran
 # # Micro object interperates f06 file, gets (area, and element stresses)
