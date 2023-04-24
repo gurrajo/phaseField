@@ -116,7 +116,7 @@ def read_grid_data(file_name):
     return out_data
 
 
-def linear_shear_displacement(file_name, grid_data):
+def linear_shear_displacement(file_name, grid_data, max_disp):
     """
     creates linear pure shear strain condition
     :param file_name: name of file in nastran_input folder to edit
@@ -137,7 +137,7 @@ def linear_shear_displacement(file_name, grid_data):
                 val = grid_data[ind, 1]
             else:
                 print("fail")
-            spcd = 5.1 * val[0, 0] / 255
+            spcd = max_disp * val[0, 0] / 255
             spcd_string = "%.5f" % spcd
             spcd_string = list(spcd_string)
             while len(spcd_string) > 7:
@@ -149,11 +149,11 @@ def linear_shear_displacement(file_name, grid_data):
                 node_string.insert(0, " ")
             node_string = "".join(node_string)
             in_data[i] = f"SPCD           2{node_string}       {direc}{spcd_string}\n"
-    with open(f'nastran_input/{file_name}_linear_shear.bdf', mode='w') as file:
+    with open(f'nastran_input/{file_name}_{max_disp}.bdf', mode='w') as file:
         file.writelines(in_data)
 
 
-def linear_displacement(file_name, grid_data, direc):
+def linear_displacement(file_name, grid_data, direc, max_disp):
     """
 
     :param file_name: name of file in nastran_input folder to edit
@@ -170,10 +170,10 @@ def linear_displacement(file_name, grid_data, direc):
             y = grid_data[ind, 2]
             if direc == "x":
                 direc_val = 1
-                spcd = 5.1 * x[0, 0] / 255
+                spcd = max_disp * x[0, 0] / 255
             elif direc == "y":
                 direc_val = 2
-                spcd = 5.1 * y[0, 0] / 255
+                spcd = max_disp * y[0, 0] / 255
             else:
                 print("no load direction stated")
                 return
@@ -188,7 +188,7 @@ def linear_displacement(file_name, grid_data, direc):
                 node_string.insert(0, " ")
             node_string = "".join(node_string)
             in_data[i] = f"SPCD           2{node_string}       {direc_val}{spcd_string}\n"
-    with open(f'nastran_input/{file_name}_linear_{direc}.bdf', mode='w') as file:
+    with open(f'nastran_input/{file_name}_{max_disp}.bdf', mode='w') as file:
         file.writelines(in_data)
 
 
