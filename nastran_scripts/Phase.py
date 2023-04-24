@@ -17,7 +17,7 @@ class PhaseMat:
     def __init__(self, D):
         E_1 = 1/D[0,0]
         E_2 = 1/D[1,1]
-        nu_12 = -D[0,1]*E_1
+        nu_12 = -D[1,0]*E_1
         G_12 = 1/(2*D[2,2])
 
         self.E_1 = list("%.6f" % E_1)
@@ -81,7 +81,7 @@ class Micro:
         C = np.zeros((1,4))
         C[0,0] = 1/self.D[0,0]
         C[0,1] = 1/self.D[1,1]
-        C[0,2] = -C[0,0]*self.D[0,1]
+        C[0,2] = -C[0,0]*self.D[1,0]
         C[0,3] = 1/(2*self.D[2,2])
         self.C = C
 
@@ -271,15 +271,27 @@ class Micro:
         D = sm.symarray("D", (3,3))
         eqs = []
         eqs.extend(np.matmul(D, self.stress_x[0, :]) - [self.strain[0,0], 0, 0])
-        eqs.extend(np.matmul(D, self.stress_y[0, :])- [0, self.strain[0,1], 0])
-        eqs.extend(np.matmul(D, self.stress_xy[0, :])- [0, 0, self.strain[0,2]])
+        eqs.extend(np.matmul(D, self.stress_y[0, :]) - [0, self.strain[0,1], 0])
+        eqs.extend(np.matmul(D, self.stress_xy[0, :]) - [0, 0, self.strain[0,2]])
         sol = solve(eqs)
-        D = np.zeros((3,3))
-        D[0,0] = self.strain[0,0]/(self.stress_x[0,0]*(1-(self.stress_x[0,1]*self.stress_y[0,0])/(self.stress_x[0,0]*self.stress_y[0,1])))
-        D[0,1] = -D[0,0]*self.stress_y[0,0]/self.stress_y[0,1]
-        D[1,0] = D[0,1]
-        D[1,1] = self.strain[0,1]/self.stress_y[0,1] - D[0,1]*self.stress_y[0,0]/self.stress_y[0,1]
-        D[2,2] = self.strain[0,2]/self.stress_xy[0,2]
+        vals = [val for val in sol.values()]
+        D = np.zeros((3, 3))
+        D[0,0] = vals[0]
+        D[0, 1] = vals[1]
+        D[0, 2] = vals[2]
+        D[1, 0] = vals[3]
+        D[1, 1] = vals[4]
+        D[1, 2] = vals[5]
+        D[2, 0] = vals[6]
+        D[2, 1] = vals[7]
+        D[2, 2] = vals[8]
+
+        D_2 = np.zeros((3, 3))
+        D_2[0,0] = self.strain[0,0]/(self.stress_x[0,0]*(1-(self.stress_x[0,1]*self.stress_y[0,0])/(self.stress_x[0,0]*self.stress_y[0,1])))
+        D_2[0,1] = -D_2[0,0]*self.stress_y[0,0]/self.stress_y[0,1]
+        D_2[1,0] = D_2[0,1]
+        D_2[1,1] = self.strain[0,1]/self.stress_y[0,1] - D[0,1]*self.stress_y[0,0]/self.stress_y[0,1]
+        D_2[2,2] = self.strain[0,2]/self.stress_xy[0,2]
         return D
 
     def elast_bounds(self):
@@ -298,7 +310,7 @@ class Micro:
         C_voigt[0, 0] = 1 / D_voigt[0, 0]
         C_voigt[0, 1] = 1 / D_voigt[1, 1]
         C_voigt[0, 3] = 1 / (2*D_voigt[2, 2])
-        C_voigt[0, 2] = -C_voigt[0, 0] * D_voigt[0, 1]
+        C_voigt[0, 2] = -C_voigt[0, 0] * D_voigt[1, 0]
 
         D_reuss = np.zeros((3,3))
         D_reuss[0, 0] = self.vol_frac * self.phase_1.D[0, 0] + (1 - self.vol_frac) * self.phase_2.D[0, 0]
@@ -311,7 +323,7 @@ class Micro:
         C_reuss[0, 0] = 1 / D_reuss[0, 0]
         C_reuss[0, 1] = 1 / D_reuss[1, 1]
         C_reuss[0, 3] = 1 / (2*D_reuss[2, 2])
-        C_reuss[0, 2] = -C_reuss[0, 0] * D_reuss[0, 1]
+        C_reuss[0, 2] = -C_reuss[0, 0] * D_reuss[1, 0]
 
         self.D_voigt = D_voigt
         self.C_voigt = C_voigt

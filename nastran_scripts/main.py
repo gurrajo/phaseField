@@ -34,7 +34,7 @@ e_node_2 = np.append(e_node_quad[:, 0:3], e_node_tri[:, 0:3], 0)
 
 test_nr = 0
 micro_arr = []
-for i in range(10):
+for i in range(1):
     D1 = D_1[i]
     D2 = D_2[i]
     phase_1 = Phase.PhaseMat(D1)
@@ -46,7 +46,7 @@ for i in range(10):
 # for i in range(10):
 #     micro_arr[i].move_f06_files()
 
-for i in range(10):
+for i in range(1):
     micro_arr[i].calc_stresses(e_node_2)
 
 # micro_test.elast_bounds()
