@@ -44,6 +44,14 @@ class PhaseMat:
         self.C = np.ndarray((1, 4))
         self.C[0] = [E_1, E_2, nu_12, G_12]
 
+    def __str__(self):
+        string = [" "]
+        for i in range(3):
+            for j in range(3):
+                string.append(str(self.D[i, j]))
+                string.append(" ")
+        return "".join(string)
+
 
 class Micro:
     def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
@@ -60,10 +68,20 @@ class Micro:
         self.phase_1 = phase_1
         self.phase_2 = phase_2
         self.test_nr = test_nr
-        #self.change_material(self.start_file_x)
-        #self.change_material(self.start_file_y)
-        #self.change_material(self.start_file_xy)
-        #self.run_nastran()  # generate f06 file for each load case
+        self.change_material(self.start_file_x)
+        self.change_material(self.start_file_y)
+        self.change_material(self.start_file_xy)
+        self.run_nastran()  # generate f06 file for each load case
+
+    def __str__(self):
+        """Order: D00, D01, D02, D10, D11, D12, D20, D21, D22"""
+        mic_string = [" "]
+        for i in range(3):
+            for j in range(3):
+                mic_string.append(str(self.D[i, j]))
+                mic_string.append(" ")
+
+        return "".join(mic_string)
 
     def calc_stresses(self, el_nodes):
         stress_x = self.ele_stress(self.start_file_x)
@@ -329,3 +347,20 @@ class Micro:
         self.C_voigt = C_voigt
         self.D_reuss = D_reuss
         self.C_reuss = C_reuss
+
+    def check_elast_bounds(self):
+        D_temp = self.D.copy()
+        D_temp[0,2] = 0
+        D_temp[2,0] = 0
+        D_temp[1,2] = 0
+        D_temp[2,1] = 0
+        temp = np.abs(D_temp) - np.abs(self.D_voigt)
+        if (np.abs(D_temp) - np.abs(self.D_voigt)).all() >= 0:
+            self.bound_check = True
+        else:
+            self.bound_check = False
+        if (np.abs(D_temp) - np.abs(self.D_reuss)).all() <= 0:
+            self.bound_check = True
+        else:
+            self.bound_check = False
+
