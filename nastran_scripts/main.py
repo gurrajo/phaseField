@@ -8,9 +8,8 @@ import re
 
 def write_dataset(arr):
     """
-    Writes a
-    :param arr:
-    :return:
+    Writes a dataset file. test_nr, phase_1, Phase_2, micro
+    :param arr: micro obj. array.
     """
     data = []
     for i, micro in enumerate(arr):
@@ -53,7 +52,7 @@ e_node_2 = np.append(e_node_quad[:, 0:3], e_node_tri[:, 0:3], 0)
 
 
 test_nr = 0
-tests = 20
+tests = 10
 micro_arr = []
 for i in range(tests):
     D1 = D_1[i]
@@ -63,17 +62,22 @@ for i in range(tests):
     micro_arr.append(Phase.Micro(phase_1, phase_2, test_nr, grid_data, e_area))
     micro_arr[i].elast_bounds()
     test_nr += 1
-    time.sleep(7)
+    time.sleep(10)
 time.sleep(25)
 
-for i in range(tests):
-    micro_arr[i].move_f06_files()
+for micro in micro_arr:
+    micro.move_f06_files()
 
-for i in range(tests):
-    micro_arr[i].calc_stresses(e_node_2)
-    micro_arr[i].check_elast_bounds()
-    if micro_arr[i].bound_check:
-        print("Passed")
+for micro in micro_arr:
+    micro.calc_stresses(e_node_2)
+    micro.check_elast_bounds()
+    micro.check_symm()
+    if micro.bound_check:
+        print("Passed Voigt-Reuss check")
+    else:
+        print("Failed")
+    if micro.sym_check:
+        print("Passed symmetry check")
     else:
         print("Failed")
 
