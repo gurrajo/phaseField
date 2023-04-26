@@ -56,7 +56,7 @@ class PhaseMat:
 class Micro:
     def __init__(self, phase_1, phase_2, test_nr, grid_data, e_area):
         self.strain = np.zeros((1,3))
-        self.strain[0] = [0.04, 0.04, 0.04]
+        self.strain[0] = [0.04, 0.04, 0.04*np.sqrt(2)]
         self.vol_frac = 0.5
         self.grid_data = grid_data
         self.e_area = e_area
@@ -142,7 +142,8 @@ class Micro:
                              f'C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_output\\{self.start_file_xy}_{self.test_nr}.bdf'])
 
     def move_f06_files(self):
-        os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_x}_{self.test_nr}.f06", f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_x}_{self.test_nr}.f06")
+        os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_x}_{self.test_nr}.f06",
+                   f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_x}_{self.test_nr}.f06")
         os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_y}_{self.test_nr}.f06",
                    f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\nastran_sol\\{self.start_file_y}_{self.test_nr}.f06")
         os.replace(f"C:\\Users\\u086939\\PycharmProjects\\pythonProject\\{self.start_file_xy}_{self.test_nr}.f06",
@@ -156,6 +157,7 @@ class Micro:
             for i in range(3):
                 tot_stress[0,i] += el_area * e_s[i + 1]
         avg_stress = tot_stress/tot_area
+        avg_stress[0, 2] *= np.sqrt(2)
         return avg_stress
 
     def read_reac_force(self, start_file):
@@ -363,4 +365,14 @@ class Micro:
             self.bound_check = True
         else:
             self.bound_check = False
+
+    def check_symm(self):
+        for i in range(3):
+            for j in range(3):
+                if np.abs(self.D[i, j] - self.D[j, i]) < 5E-4:
+                    self.sym_check = True
+                else:
+                    self.sym_check = False
+                    return
+
 
