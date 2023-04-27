@@ -18,17 +18,6 @@ def write_dataset(arr):
         file.writelines(data)
 
 
-def read_dataset(file_name):
-    with open(f'{file_name}.txt', 'r') as file:
-        in_data = file.readlines()
-    data = np.ndarray((len(in_data), 28))
-    for i, s in enumerate(in_data):
-        s_out = re.findall("[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", s)
-        nums = [float(val) for val in s_out]
-        data[i] = nums
-    return data
-
-
 start_time = time.time()
 orig_file_name = "new_orig_x"
 # generate material space with latin hypercube
@@ -52,7 +41,7 @@ e_node_2 = np.append(e_node_quad[:, 0:3], e_node_tri[:, 0:3], 0)
 
 
 test_nr = 0
-tests = 10
+tests = 1000
 micro_arr = []
 for i in range(tests):
     D1 = D_1[i]
@@ -86,7 +75,6 @@ for micro in micro_arr:
 # # Micro object runs bdf files in Nastran
 # # Micro object interperates f06 file, gets (area, and element stresses)
 write_dataset(micro_arr)
-data = read_dataset("data_set")
 stop_time = time.time()
 run_time = stop_time - start_time  # seconds
 print(run_time)
