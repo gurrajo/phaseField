@@ -32,16 +32,20 @@ def extract_D_mat(data, ind):
     return D1, D2, DC
 
 
-def run_train_sample(nn, N_s):
+def run_train_sample(N_s):
     D_bar = []
     mse = []
+    D1 = np.zeros((3, 3))
+    D2 = np.zeros((3, 3))
+    DC = np.zeros((3, 3))
+    nn = DMN.Network(N, D1, D2, DC)
     for i in range(N_s):
         (D1, D2, DC) = extract_D_mat(data, i)
-        nn = DMN.Network(N, D1, D2, DC)
+        nn.update_phases(D1, D2, DC)
         nn.forward_pass()
         D_bar.append(nn.get_comp())
         mse.append(nn.mse)
-    return D_bar, mse
+    return D_bar, mse, nn
 
 
 def tot_cost(mse):
@@ -52,11 +56,7 @@ def tot_cost(mse):
 data = read_dataset("data_set")
 N = 5
 N_s = 1000
-D1 = np.zeros((3, 3))
-D2 = np.zeros((3, 3))
-DC = np.zeros((3, 3))
-dmn_test = DMN.Network(N, D1, D2, DC)
-D_bar, mse = run_train_sample(dmn_test, N_s)
+D_bar, mse, nn = run_train_sample(N_s)
 (D1, D2, DC) = extract_D_mat(data, 0)
 C_0 = tot_cost(mse)
 

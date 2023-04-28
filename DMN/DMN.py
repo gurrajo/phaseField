@@ -6,11 +6,16 @@ class Branch:
     represents a branch in the deep-material network.
     The branch is the connection between two nodes
     """
-    def __init__(self, child_1, child_2, f, theta, inp):
+    def __init__(self, child_1, child_2, theta, inp):
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
-        self.f_1 = f
+        if not inp:
+            self.w = self.ch_1.w + self.ch_2.w
+            self.f_1 = self.ch_1.w/self.w
+        else:
+            self.w = 0
+            self.f_1 = self.w
         self.f_2 = 1 - self.f_1
         self.theta = theta
         self.D_r = np.zeros((3, 3))  # output compliance before rotation
@@ -52,30 +57,35 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.N = N
+        self.N = N  # network depth
         self.D_1 = D_1  # phase 1 compliance (all samples)
         self.D_2 = D_2  # phase 2 compliance (all samples)
         self.D_correct = D_correct  # correct compliance after homogenization
         self.input_layer = []
+        rng = np.random.default_rng()
         for j in range(2 ** (N - 1)):
+            samples = rng.uniform(size=(2, 1))
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                self.input_layer.append(Branch(D_1, D_1, 1, 0, True))
+                in_node = Branch(D_1, D_1, samples[1]*np.pi/2 - np.pi/2, True)
             else:
                 # ´Phase 2 input nodes
-                self.input_layer.append(Branch(D_2, D_2, 1, 0, True))
+                in_node = Branch(D_2, D_2, samples[1]*np.pi/2 - np.pi/2, True)
+            in_node.w = samples[0]
+            self.input_layer.append(in_node)
+
         self.layers = []
         self.layers.append(self.input_layer)
         for i in range(1, N):
             self.layers.append(self.fill_layer(i))
 
     def fill_layer(self, i):
-        rng = np.random.default_rng()
         prev_layer = self.layers[i-1]
         new_layer = []
+        rng = np.random.default_rng()
         for i in range(int(len(prev_layer)/2)):
-            samples = rng.uniform(size=(2, 1))
-            new_layer.append(Branch(prev_layer[i*2], prev_layer[i*2 + 1], samples[0], samples[1]*2*np.pi, False))
+            samples = rng.uniform(size=(1, 1))
+            new_layer.append(Branch(prev_layer[i*2], prev_layer[i*2 + 1], samples[0]*np.pi/2 - np.pi/2, False))
         return new_layer
 
     def get_comp(self):
@@ -88,7 +98,8 @@ class Network:
                 parent.rotate_comp()
         self.calc_cost()
 
-    def update_phases(self, D_1, D_2):
+    def update_phases(self, D_1, D_2, DC):
+        self.D_correct = DC
         for j in range(2 ** (self.N - 1)):
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
