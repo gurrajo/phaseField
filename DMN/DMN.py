@@ -144,6 +144,7 @@ class Branch:
         self.D_d_Dr = D_d_Dr
         self.Dr_d_f1 = Dr_d_f1
 
+
 class Network:
     """
     Represents the network structure.
