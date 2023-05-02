@@ -39,6 +39,7 @@ class Branch:
         self.D_r[1, 2] = self.f_1*self.D_1[1, 2] + self.f_2*self.D_2[1, 2] - 1/gamma*self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])*(self.D_1[0,1] - self.D_2[0,1])
         self.D_r[2, 1] = self.D_r[1, 2]
         self.D_r[2, 2] = self.f_1*self.D_1[2, 2] + self.f_2*self.D_2[2, 2] - 1/gamma*self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])**2
+        self.gamma = gamma
 
     def rot_mat(self, theta):
         R = np.zeros((3, 3))
@@ -50,6 +51,98 @@ class Branch:
     def rotate_comp(self):
         self.D_bar = np.matmul(np.matmul(self.rot_mat(-self.theta), self.D_r), self.rot_mat(self.theta))
 
+    def gradients(self):
+        # derivative of D comps with respect to D_r
+        D_d_Dr = np.zeros((3,3,3,3))
+        R_1 = self.rot_mat(-self.theta)
+        R_2 = self.rot_mat(self.theta)
+        #   R_1[i,0]*R_2[0,j]
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    for l in range(3):
+                        D_d_Dr[i,j,k,l] = R_1[i,k]*R_2[l,j]
+        self.D_d_Dr = D_d_Dr
+
+        # derivatives of D_r comps with respect to first child D1
+        Dr_d_D1 = np.zeros((3,3,3,3))
+        Dr_d_D1[:,0,0,0] = 1/self.gamma*[self.f_1*self.D_2[0,0]**2/self.gamma,
+                                        self.f_2*(-self.D_r[0,1] + self.D_2[0,1]),
+                                        self.f_2*(-self.D_r[0,2] + self.D_2[0,2])]
+        Dr_d_D1[:, 1, 0, 0] = 1 / self.gamma * [self.f_2 * (-self.D_r[0, 1] + self.D_2[0, 1]),
+                                               self.f_1*self.f_2**2*(self.D_1[0,1]-self.D_2[0,1])**2/self.gamma,
+                                               self.f_1*self.f_2**2*(self.D_1[0,2]-self.D_2[0,2])*(self.D_1[0,1]-self.D_2[0,1])/self.gamma]
+        Dr_d_D1[:,2,0,0] = 1/self.gamma*[self.f_2*(-self.D_r[0,2] + self.D_2[0,2]),
+                                        self.f_1*self.f_2**2*(self.D_1[0,2]-self.D_2[0,2])*(self.D_1[0,1]-self.D_2[0,1])/self.gamma,
+                                        self.f_1*self.f_2**2*(self.D_1[0,2]-self.D_2[0,2])**2/self.gamma]
+
+        Dr_d_D1[:,0,0,1] = [0,self.f_1*self.D_2[0,0]/self.gamma,0]
+        Dr_d_D1[:, 1, 0, 1] =[self.f_1*self.D_2[0,0]/self.gamma,
+                             -2*self.f_1*self.f_2*(self.D_1[0,1] - self.D_2[0,1])(self.gamma),
+                             -self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])/self.gamma]
+        Dr_d_D1[:, 2, 0, 1] = [0,-self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])/self.gamma,0]
+
+        Dr_d_D1[:,:,1,0] = Dr_d_D1[:,:,0,1]
+
+        Dr_d_D1[:,0,0,2] = [0,0,self.f_1*self.D_2[0,0]/self.gamma]
+        Dr_d_D1[:, 1, 0, 2] = [0, 0, -self.f_1*self.f_2*(self.D_1[0,1] - self.D_2[0,1])/self.gamma]
+        Dr_d_D1[:, 2, 0, 2] = [self.f_1*self.D_2[0,0]/self.gamma,
+                              -self.f_1*self.f_2*(self.D_1[0,1] - self.D_2[0,1])/self.gamma,
+                              -2*self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])/self.gamma]
+
+        Dr_d_D1[:, :, 2, 0] = Dr_d_D1[:, :, 0, 2]
+
+        Dr_d_D1[:,:,1,1] = [[0,0,0],[0,self.f_1,0],[0,0,0]]
+        Dr_d_D1[:, :, 1, 2] = [[0, 0, 0], [0, 0, self.f_1], [0, self.f_1, 0]]
+        Dr_d_D1[:, :, 2, 1] = Dr_d_D1[:, :, 1, 2]
+        Dr_d_D1[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_1]]
+
+        Dr_d_D2 = np.zeros((3,3,3,3))
+        Dr_d_D2[:,0,0,0] = 1/self.gamma*[self.f_1*self.D_1[0,0]**2/self.gamma,
+                                        self.f_2*(-self.D_r[0,1] + self.D_1[0,1]),
+                                        self.f_2*(-self.D_r[0,2] + self.D_1[0,2])]
+        Dr_d_D2[:, 1, 0, 0] = 1 / self.gamma * [self.f_2 * (-self.D_r[0, 1] + self.D_1[0, 1]),
+                                               self.f_1*self.f_2**2*(self.D_2[0,1]-self.D_1[0,1])**2/self.gamma,
+                                               self.f_1*self.f_2**2*(self.D_2[0,2]-self.D_1[0,2])*(self.D_2[0,1]-self.D_1[0,1])/self.gamma]
+        Dr_d_D2[:,2,0,0] = 1/self.gamma*[self.f_2*(-self.D_r[0,2] + self.D_1[0,2]),
+                                        self.f_1*self.f_2**2*(self.D_2[0,2]-self.D_1[0,2])*(self.D_2[0,1]-self.D_1[0,1])/self.gamma,
+                                        self.f_1*self.f_2**2*(self.D_2[0,2]-self.D_1[0,2])**2/self.gamma]
+
+        Dr_d_D2[:,0,0,1] = [0,self.f_1*self.D_1[0,0]/self.gamma,0]
+        Dr_d_D2[:, 1, 0, 1] =[self.f_1*self.D_1[0,0]/self.gamma,
+                             -2*self.f_1*self.f_2*(self.D_2[0,1] - self.D_1[0,1])(self.gamma),
+                             -self.f_1*self.f_2*(self.D_2[0,2] - self.D_1[0,2])/self.gamma]
+        Dr_d_D2[:, 2, 0, 1] = [0,-self.f_1*self.f_2*(self.D_2[0,2] - self.D_1[0,2])/self.gamma,0]
+        Dr_d_D2[:, :, 1, 0] = Dr_d_D2[:, :, 0, 1]
+        Dr_d_D2[:,0,0,2] = [0,0,self.f_1*self.D_1[0,0]/self.gamma]
+        Dr_d_D2[:, 1, 0, 2] = [0, 0, -self.f_1*self.f_2*(self.D_2[0,1] - self.D_1[0,1])/self.gamma]
+        Dr_d_D2[:, 2, 0, 2] = [self.f_1*self.D_1[0,0]/self.gamma,
+                              -self.f_1*self.f_2*(self.D_2[0,1] - self.D_1[0,1])/self.gamma,
+                              -2*self.f_1*self.f_2*(self.D_2[0,2] - self.D_1[0,2])/self.gamma]
+        Dr_d_D2[:, :, 2, 0] = Dr_d_D2[:, :, 0, 2]
+        Dr_d_D2[:,:,1,1] = [[0,0,0],[0,self.f_1,0],[0,0,0]]
+        Dr_d_D2[:, :, 1, 2] = [[0, 0, 0], [0, 0, self.f_1], [0, self.f_1, 0]]
+        Dr_d_D2[:, :, 2, 1] = Dr_d_D2[:, :, 1, 2]
+        Dr_d_D2[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_1]]
+
+        Dr_d_f1 = np.zeros((3,3))
+        Dr_d_f1[0,0] = 1/self.gamma*(self.D_1[0,0] - self.D_2[0,0])*self.D_r[0,0]
+        Dr_d_f1[0, 1] = 1 / self.gamma * ((self.D_1[0,0] - self.D_2[0,0])*self.D_r[0,1] + self.D_1[0,1]*self.D_2[0,0] - self.D_2[0,1]*self.D_1[0,0])
+        Dr_d_f1[1,0] = Dr_d_f1[0,1]
+        Dr_d_f1[0, 2] = 1 / self.gamma * ((self.D_1[0,0] - self.D_2[0,0])*self.D_r[0,2] + self.D_1[0,2]*self.D_2[0,0] - self.D_2[0,2]*self.D_1[0,0])
+        Dr_d_f1[2, 0] = Dr_d_f1[0, 2]
+        Dr_d_f1[1,1] = self.D_1[1,1] - self.D_2[1,1] + 1/self.gamma**2*(self.f_1**2*self.D_2[0,0] - self.f_2**2*self.D_1[0,0])*(self.D_1[0,1] - self.D_2[0,1])**2
+        Dr_d_f1[1, 2] = self.D_1[1, 2] - self.D_2[1, 2] + 1 / self.gamma ** 2 * (
+                    self.f_1 ** 2 * self.D_2[0, 0] - self.f_2**2 * self.D_1[0, 0]) * (self.D_1[0, 2] - self.D_2[0, 2])*(self.D_1[0,1] - self.D_2[0,1])
+        Dr_d_f1[2,1] = Dr_d_f1[1,2]
+        Dr_d_f1[2, 2] = self.D_1[2, 2] - self.D_2[2, 2] + 1 / self.gamma ** 2 * (
+                    self.f_1 ** 2 * self.D_2[0, 0] - self.f_2 ** 2 * self.D_1[0, 0]) * (
+                                    self.D_1[0, 2] - self.D_2[0, 2]) ** 2
+
+        self.Dr_d_D1 = Dr_d_D1
+        self.Dr_d_D2 = Dr_d_D2
+        self.D_d_Dr = D_d_Dr
+        self.Dr_d_f1 = Dr_d_f1
 
 class Network:
     """
@@ -96,6 +189,7 @@ class Network:
             for parent in self.layers[i]:
                 parent.homogen()
                 parent.rotate_comp()
+                parent.gradients()
         self.calc_cost()
 
     def update_phases(self, D_1, D_2, DC):
@@ -110,8 +204,17 @@ class Network:
                 self.layers[0][j].ch_1 = D_2
                 self.layers[0][j].ch_2 = D_2
 
+
     def calc_cost(self):
         D_bar = self.get_comp()
-        self.mse = np.linalg.norm((self.D_correct - D_bar), 'fro')**2/np.linalg.norm(self.D_correct, 'fro') ** 2
+        D = np.zeros((1, 9))
+        D_cor = np.zeros((1, 9))
+        k = 0
+        for i in range(3):
+            for j in range(3):
+                D_cor[0,k] = self.D_correct[i,j]
+                D[0,k] = D_bar[i,j]
+                k += 1
+        self.del_C = (D - D_cor)/(np.linalg.norm(self.D_correct, 'fro')**2)  # cost gradient
 
 

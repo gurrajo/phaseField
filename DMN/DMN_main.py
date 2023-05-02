@@ -34,7 +34,7 @@ def extract_D_mat(data, ind):
 
 def run_train_sample(N_s):
     D_bar = []
-    mse = []
+    del_C = np.zeros((1,9))
     D1 = np.zeros((3, 3))
     D2 = np.zeros((3, 3))
     DC = np.zeros((3, 3))
@@ -44,8 +44,9 @@ def run_train_sample(N_s):
         nn.update_phases(D1, D2, DC)
         nn.forward_pass()
         D_bar.append(nn.get_comp())
-        mse.append(nn.mse)
-    return D_bar, mse, nn
+        del_C += nn.del_C
+    del_C *= 1/(2*N_s)
+    return D_bar, del_C, nn
 
 
 def tot_cost(mse):
