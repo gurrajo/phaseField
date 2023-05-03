@@ -43,6 +43,8 @@ def run_train_sample(N_s):
         (D1, D2, DC) = extract_D_mat(data, i)
         nn.update_phases(D1, D2, DC)
         nn.forward_pass()
+        nn.calc_cost()
+        nn.backwards_prop()
         D_bar.append(nn.get_comp())
         del_C += nn.del_C
     del_C *= 1/(2*N_s)
@@ -58,8 +60,8 @@ data = read_dataset("data_set")
 N = 5
 N_s = 1000
 D_bar, mse, nn = run_train_sample(N_s)
+
 (D1, D2, DC) = extract_D_mat(data, 0)
 C_0 = tot_cost(mse)
 
 print(1)
-
