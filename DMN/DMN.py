@@ -7,6 +7,8 @@ class Branch:
     The branch is the connection between two nodes
     """
     def __init__(self, child_1, child_2, theta, inp):
+        self.eta_z = 0.1
+        self.eta_theta = 0.1  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -14,14 +16,15 @@ class Branch:
             self.w = self.ch_1.w + self.ch_2.w
             self.f_1 = self.ch_1.w/self.w
         else:
+
+            self.z = 0
             self.w = 0
             self.f_1 = self.w
-            self.z = np.max(self.w)
         self.f_2 = 1 - self.f_1
         self.theta = theta
         self.D_r = np.zeros((3, 3))  # output compliance before rotation
         self.D_bar = np.zeros((3, 3))  # output compliance after rotation
-
+        self.delta = np.zeros((1,9))
 
     def homogen(self):
         if self.input:
@@ -50,6 +53,13 @@ class Branch:
         R[0, :] = [np.cos(theta)**2, np.sin(theta)**2, np.sqrt(2)*np.sin(theta)*np.cos(theta)]
         R[1, :] = [np.sin(theta) ** 2, np.cos(theta) ** 2, -np.sqrt(2) * np.sin(theta) * np.cos(theta)]
         R[2, :] = [-np.sqrt(2) * np.sin(theta) * np.cos(theta), np.sqrt(2) * np.sin(theta) * np.cos(theta), np.cos(theta)**2 - np.sin(theta)**2]
+        return R
+
+    def rot_mat_prime(self, theta):
+        R = np.zeros((3, 3))
+        R[0, :] = [-np.sin(2*theta), np.sin(2*theta), np.sqrt(2)*np.cos(2*theta)]
+        R[1, :] = [np.sin(2*theta), -np.sin(2*theta), -np.sqrt(2)*np.cos(2*theta)]
+        R[2, :] = [-np.sqrt(2) * np.cos(theta*2), np.sqrt(2) * np.cos(theta*2), -2*np.sin(2*theta)]
         return R
 
     def rotate_comp(self):
@@ -149,23 +159,26 @@ class Branch:
                     self.f_1 ** 2 * self.D_2[0, 0] - self.f_2 ** 2 * self.D_1[0, 0]) * (
                                     self.D_1[0, 2] - self.D_2[0, 2]) ** 2
 
-
+        self.D_d_theta = np.matmul(np.matmul(-self.rot_mat_prime(-self.theta), self.D_bar), self.rot_mat(self.theta)) +\
+                    np.matmul(np.matmul(-self.rot_mat(-self.theta), self.D_bar), self.rot_mat_prime(self.theta))
 
         self.Dr_d_D1 = Dr_d_D1
         self.Dr_d_D2 = Dr_d_D2
         self.D_d_Dr = D_d_Dr
         self.Dr_d_f1 = Dr_d_f1
 
-
-
-    def update_weights(self, del_C):
+    def update_weights(self, dC_d_z):
         """
         Update weight for branch node. use RELu for input layer only.
         :return:
         """
+        dC_d_z = 0  # derivative of cost function with respect to the activation z
+
+        self.z = self.z - self.eta_z*dC_d_z
+        self.w = np.max(self.z, 0)  # the weights are activated through the RElu function
 
     def calc_delta(self, delta_pre, child_1):
-        delta_new = np.zeros((1,9))
+        delta_new = np.zeros((3,3))
         if child_1:  # if current node is child 1 of the parent node
             Dr_d_D = self.Dr_d_D1
         else:
@@ -177,6 +190,7 @@ class Branch:
         for j in range(3):
             for k in range(3):
                 delta_new[j,k] = np.sum(temp*Dr_d_D[:,:,j,k])
+
         return delta_new
 
 
@@ -227,7 +241,6 @@ class Network:
                 parent.rotate_comp()
                 parent.gradients()
 
-
     def update_phases(self, D_1, D_2, DC):
         self.D_correct = DC
         for j in range(2 ** (self.N - 1)):
@@ -236,34 +249,31 @@ class Network:
                 self.layers[0][j].ch_1 = D_1
                 self.layers[0][j].ch_2 = D_1
             else:
-                # ´Phase 2 input nodes
+                # Phase 2 input nodes
                 self.layers[0][j].ch_1 = D_2
                 self.layers[0][j].ch_2 = D_2
 
     def calc_cost(self):
         D_bar = self.get_comp()
-        D = np.zeros((1, 9))
-        D_cor = np.zeros((1, 9))
-        k = 0
-        for i in range(3):
-            for j in range(3):
-                D_cor[0,k] = self.D_correct[i,j]
-                D[0,k] = D_bar[i,j]
-                k += 1
         self.del_C = (D_bar - self.D_correct)/(np.linalg.norm(self.D_correct, 'fro')**2)  # cost gradient
 
     def backwards_prop(self):
-        delta_pre = np.zeros((1, 9))
         for i, layer in enumerate(reversed(self.layers)):
             for k, node in enumerate(layer):
                 if i == 0:
                     # output layer
                     delta_0 = self.del_C
-                    delta_pre = delta_0
+                    delta_new = delta_0
                 else:
-                    if 
-                    delta_new = node.calc_delta(delta_pre)
-            print(1)
+                    if np.mod(k, 2) == 0:
+                        delta_new = node.calc_delta(delta_pre, True)
+                    else:
+                        delta_new = node.calc_delta(delta_pre, False)
+                node.delta = delta_new
+                dC_d_theta = np.sum(delta_new*node.D_d_theta)
+                node.theta = node.theta - node.eta_theta*dC_d_theta
+                delta_pre = delta_new
+        print(1)
 
 
 def component_vec(matrix):

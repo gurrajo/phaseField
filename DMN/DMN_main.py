@@ -34,7 +34,7 @@ def extract_D_mat(data, ind):
 
 def run_train_sample(N_s):
     D_bar = []
-    del_C = np.zeros((1,9))
+    del_C = np.zeros((3,3))
     D1 = np.zeros((3, 3))
     D2 = np.zeros((3, 3))
     DC = np.zeros((3, 3))
@@ -57,7 +57,7 @@ def tot_cost(mse):
 
 
 data = read_dataset("data_set")
-N = 5
+N = 4
 N_s = 1000
 D_bar, mse, nn = run_train_sample(N_s)
 
