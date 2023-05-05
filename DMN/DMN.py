@@ -16,7 +16,6 @@ class Branch:
             self.w = self.ch_1.w + self.ch_2.w
             self.f_1 = self.ch_1.w/self.w
         else:
-
             self.z = 0
             self.w = 0
             self.f_1 = self.w
@@ -30,7 +29,11 @@ class Branch:
         if self.input:
             self.D_1 = self.ch_1
             self.D_2 = self.ch_2
+            self.w = np.max(self.z)
+            self.f_1 = self.w
         else:
+            self.w = self.ch_1.w + self.ch_2.w
+            self.f_1 = self.ch_1.w / self.w
             self.D_1 = self.ch_1.D_bar
             self.D_2 = self.ch_2.D_bar
 
@@ -177,19 +180,19 @@ class Branch:
         self.z = self.z - self.eta_z*dC_d_z
         self.w = np.max(self.z, 0)  # the weights are activated through the RElu function
 
-    def calc_delta(self, delta_pre, child_1):
-        delta_new = np.zeros((3,3))
+    def calc_delta(self, child_1):
+        delta_new = np.zeros((3, 3))
         if child_1:  # if current node is child 1 of the parent node
             Dr_d_D = self.Dr_d_D1
         else:
-            Dr_d_D = self.Dr_d_D1
-        temp = np.zeros((3,3))
+            Dr_d_D = self.Dr_d_D2
+        temp = np.zeros((3, 3))
         for j in range(3):
             for k in range(3):
-                temp[j, k] = np.sum(delta_pre*self.D_d_Dr[:,:,j,k])
+                temp[j, k] = np.sum(self.delta*self.D_d_Dr[:, :, j, k])
         for j in range(3):
             for k in range(3):
-                delta_new[j,k] = np.sum(temp*Dr_d_D[:,:,j,k])
+                delta_new[j, k] = np.sum(temp*Dr_d_D[:, :, j, k])
 
         return delta_new
 
@@ -266,13 +269,38 @@ class Network:
                     delta_new = delta_0
                 else:
                     if np.mod(k, 2) == 0:
-                        delta_new = node.calc_delta(delta_pre, True)
+                        parent_node = self.layers[i-1][int((i-np.mod(i, 2))/2)]
+                        delta_new = parent_node.calc_delta(True)
                     else:
-                        delta_new = node.calc_delta(delta_pre, False)
+                        parent_node = self.layers[i - 1][int((i - np.mod(i, 2)) / 2)]
+                        delta_new = parent_node.calc_delta(False)
                 node.delta = delta_new
                 dC_d_theta = np.sum(delta_new*node.D_d_theta)
                 node.theta = node.theta - node.eta_theta*dC_d_theta
-                delta_pre = delta_new
+        for j, node in enumerate(self.layers[1]):  # update the layers with activations z
+            dC_dZj = 0
+            for i, node_2 in enumerate(self.layers[1]):
+                parent_ind = int((i - np.mod(i, 2)) / 2)
+                parent_node = self.layers[2][parent_ind]
+                if i == j:
+                    dwn_dwn = 1
+                else:
+                    dwn_dwn = 0
+                if parent_ind*2 + 1 == j:
+                    dwn_dwnp = 1
+                else:
+                    dwn_dwnp = 0
+                df_dw = 1/parent_node.w*(dwn_dwn - node_2.f_1*dwn_dwnp)
+                temp = np.zeros((3, 3))
+                for k in range(3):
+                    for m in range(3):
+                        temp[k, m] = parent_node.delta*node_2.D_d_Dr[:, :, k, m]
+                temp_2 = np.sum(temp*node_2.Dr_d_f1)
+                dC_dZj += df_dw*temp_2
+            if node.z < 0:
+                dC_dZj = 0
+            node.dC_dZ = dC_dZj
+            node.z -= node.eta_z*dC_dZj
         print(1)
 
 
