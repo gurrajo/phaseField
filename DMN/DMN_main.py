@@ -1,6 +1,9 @@
 import numpy as np
 import re
 import DMN
+import matplotlib.pylab as plt
+import time
+import random
 
 
 def read_dataset(file_name):
@@ -32,23 +35,30 @@ def extract_D_mat(data, ind):
     return D1, D2, DC
 
 
-def run_train_sample(N_s):
-    D_bar = []
-    del_C = np.zeros((3,3))
+def run_train_sample(epoch, M):
+    N_s = 1000
     D1 = np.zeros((3, 3))
     D2 = np.zeros((3, 3))
     DC = np.zeros((3, 3))
     nn = DMN.Network(N, D1, D2, DC)
-    for i in range(N_s):
-        (D1, D2, DC) = extract_D_mat(data, i)
-        nn.update_phases(D1, D2, DC)
-        nn.forward_pass()
-        nn.calc_cost()
-        nn.backwards_prop()
-        D_bar.append(nn.get_comp())
-        del_C += nn.del_C
-    del_C *= 1/(2*N_s)
-    return D_bar, del_C, nn
+    cost = []
+
+    for i in range(epoch):
+        np.random.shuffle(data)
+        k = 0
+        for i in range(int(N_s/M)):
+            for j in range(M):
+                (D1, D2, DC) = extract_D_mat(data, k)
+                nn.update_phases(D1, D2, DC)
+                nn.forward_pass()
+                nn.calc_cost()
+                nn.backwards_prop()
+                k += 1
+            nn.learn_step()
+            cost.append(np.sum(nn.C)/M)
+            nn.C = []
+            print(cost[i])
+    return cost, nn
 
 
 def tot_cost(mse):
@@ -56,12 +66,13 @@ def tot_cost(mse):
     return C_0
 
 
+start_time = time.time()
 data = read_dataset("data_set")
-N = 4
-N_s = 1000
-D_bar, mse, nn = run_train_sample(N_s)
+N = 8
+mini_batch = 20
 
-(D1, D2, DC) = extract_D_mat(data, 0)
-C_0 = tot_cost(mse)
-
+cost, nn = run_train_sample(1, mini_batch)
+print(time.time() - start_time)
+plt.plot(range(len(cost)), cost)
+plt.show()
 print(1)
