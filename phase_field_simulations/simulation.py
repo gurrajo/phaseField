@@ -3,7 +3,7 @@ import shapefile
 import pandas as pd
 import fiona
 import ezdxf
-import numpy
+import numpy as np
 
 
 def init(value=0.5, noise=0.02):
@@ -44,7 +44,7 @@ free_energy_density = bulk_free_energy_density + interfacial_free_energy_density
 plt.figure(figsize=(7,4))
 plt.sympy_function(bulk_free_energy_density.subs(A, 0.8), (-0.2, 1.2))
 plt.xlabel("c")
-plt.title("Bulk free energy");
+plt.title("Bulk free energy")
 
 ps.fd.functional_derivative(free_energy_density, c)
 
