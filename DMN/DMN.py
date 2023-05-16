@@ -9,8 +9,8 @@ class Branch:
     def __init__(self, child_1, child_2, theta, inp, z):
         self.dC_dZj = 0
         self.dC_dTheta = []
-        self.eta_z = 0.01
-        self.eta_theta = 0.01  # learning rates
+        self.eta_z = 0.0002
+        self.eta_theta = 0.05  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -25,24 +25,17 @@ class Branch:
         else:
             self.z = z
             self.w = np.max([self.z, 0])
-            self.w = np.min([self.w, 1])
-            self.f_1 = self.w
+            self.f_1 = 1
         self.f_2 = 1 - self.f_1
 
     def homogen(self):
-        if self.input:
-            self.D_1 = self.ch_1.D_bar
-            self.D_2 = self.ch_2.D_bar
-            self.w = np.max([self.z, 0])
-            self.f_1 = np.min([self.w, 1])
+        self.w = self.ch_1.w + self.ch_2.w
+        if self.w == 0:
+            self.f_1 = 0
         else:
-            self.w = self.ch_1.w + self.ch_2.w
-            if self.w == 0:
-                self.f_1 = 0
-            else:
-                self.f_1 = self.ch_1.w / self.w
-            self.D_1 = self.ch_1.D_bar
-            self.D_2 = self.ch_2.D_bar
+            self.f_1 = self.ch_1.w / self.w
+        self.D_1 = self.ch_1.D_bar
+        self.D_2 = self.ch_2.D_bar
 
         self.f_2 = 1 - self.f_1
         gamma = self.f_1*self.D_2[0, 0] + self.f_2*self.D_1[0, 0]
@@ -177,17 +170,23 @@ class Branch:
         self.D_d_Dr = D_d_Dr
         self.Dr_d_f1 = Dr_d_f1
 
-    def update_weights(self, lam, xi, zs):
+    def update_theta(self):
+        self.theta -= self.eta_theta * np.mean(self.dC_dTheta)
+        self.dC_dTheta = []
+
+    def update_z(self, lam, xi, zs):
         """
         Update weight for branch node. use RELu for input layer only.
         :return:
         """
-        if self.input:
-            dL_d_Z = 2*lam*(np.sum(zs) - xi*len(zs))
+        dL_d_Z = 2*lam*(np.sum(zs) - xi*len(zs))
+        if self.z <= 0:
+            self.z = 0
+        else:
             self.z -= self.eta_z*(self.dC_dZj + dL_d_Z)
-        self.theta -= self.eta_theta*np.mean(self.dC_dTheta)
+        self.w = np.max([self.z, 0])
         self.dC_dZj = []
-        self.dC_dTheta = []
+        self.delta_batch = []
 
     def calc_delta(self, child_1):
         delta_new = np.zeros((3, 3))
@@ -222,27 +221,27 @@ class Network:
         self.input_layer = []
         rng = np.random.default_rng()
         for j in range(2 ** (N - 1)):
+            samples = rng.uniform(size=(2, 1))
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                in_node = Branch(D_1, D_1, 0, True,0)
+                in_node = Branch(D_1, D_1, samples[0]*np.pi - np.pi/2, True, samples[1]*0.6 + 0.2)
+                in_node.D_bar = D_1
             else:
                 # Phase 2 input nodes
-                in_node = Branch(D_2, D_2, 0, True,0)
-            in_node.D_bar = D_1
+                in_node = Branch(D_2, D_2, samples[0]*np.pi - np.pi/2, True, samples[1]*0.6 + 0.2)
+                in_node.D_bar = D_2
             self.input_layer.append(in_node)
 
         self.layers = []
-        first_layer = []
-        for j in range(int(len(self.input_layer)/2)):
-            samples = rng.uniform(size=(2, 1))
-            first_layer.append(Branch(self.input_layer[j*2], self.input_layer[j*2 + 1], samples[0]*np.pi - np.pi/2, True, samples[1]*0.6 + 0.2))
-        self.layers.append(first_layer)
-        self.zs = [np.max(node.z, 0) for node in self.layers[0]]
-        for i in range(1, N-1):
+        self.zs = [np.max(node.z, 0) for node in self.input_layer]
+        for i in range(0, N-1):
             self.layers.append(self.fill_layer(i))
 
     def fill_layer(self, i):
-        prev_layer = self.layers[i-1]
+        if i == 0:
+            prev_layer = self.input_layer
+        else:
+            prev_layer = self.layers[i-1]
         new_layer = []
         rng = np.random.default_rng()
         for j in range(int(len(prev_layer)/2)):
@@ -251,7 +250,7 @@ class Network:
         return new_layer
 
     def get_comp(self):
-        return self.layers[-2][0].D_bar
+        return self.layers[-1][0].D_bar
 
     def forward_pass(self):
         for layer in self.layers:
@@ -305,28 +304,29 @@ class Network:
             prev_layer = layer
 
     def learn_step(self):
-        for j, node in enumerate(self.layers[0]):  # update the layers with activations z
+        for j, node in enumerate(self.input_layer):  # update the layers with activations z
             if node.z <= 0:
                 node.dC_dZj = 0
                 continue
             parent_ind = int((j - np.mod(j, 2)) / 2)
-            parent_node = self.layers[1][parent_ind]
+            parent_node = self.layers[0][parent_ind]
             if parent_node.w == 0:
                 print("w==0")
-            df_dw = 1/parent_node.w*(1 - node.f_1)
+            df_dw = -1/parent_node.w
             alpha = np.zeros((3, 3))
             delta = np.mean(parent_node.delta_batch, 0)
             for k in range(3):
                 for m in range(3):
                     alpha[k, m] = np.sum(delta[k, m]*parent_node.D_d_Dr[:, :, k, m])
-            temp_2 = np.sum(alpha*node.Dr_d_f1)
+            temp_2 = np.sum(alpha*parent_node.Dr_d_f1)
             dC_dZj = df_dw*temp_2
             node.dC_dZj = dC_dZj
         for layer in self.layers:
             for node in layer:
-                node.update_weights(self.lam, self.xi, self.zs)
-                node.delta_batch = []
-        self.zs = [np.max(node.z, 0) for node in self.layers[0]]
+                node.update_theta()
+        for node in self.input_layer:
+            node.update_z(self.lam, self.xi, self.zs)
+        self.zs = [np.max([node.z, 0]) for node in self.input_layer]
 
 
 def component_vec(matrix):

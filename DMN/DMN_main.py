@@ -4,6 +4,10 @@ import DMN
 import matplotlib.pylab as plt
 import time
 import random
+import multiprocessing as mp
+
+
+#def write_dmn(dmn):
 
 
 def read_dataset(file_name):
@@ -36,7 +40,7 @@ def extract_D_mat(data, ind):
 
 
 def run_train_sample(epoch, M, nn=False):
-    N_s = 1000
+    N_s = 800
     if not nn:
         D1 = np.zeros((3, 3))
         D2 = np.zeros((3, 3))
@@ -46,11 +50,17 @@ def run_train_sample(epoch, M, nn=False):
     else:
         print("old network")
     cost = []
-    z_0 = np.zeros((int(epoch*N_s/M), 1))
     theta_0 = np.zeros((int(epoch * N_s / M), 1))
-    z_5 = np.zeros((int(epoch*N_s/M), 1))
+    zs = np.zeros((int(epoch*N_s/M), 2**(N-1)))
     m = 0
     epoch_cost = np.zeros((epoch, 1))
+    inter_plot = False  # interactive plotting on
+    if inter_plot:
+        plt.ion()
+        fig = plt.figure()
+        ax = fig.add_subplot(211)
+        ax2 = fig.add_subplot(212)
+    start_time = time.time()
     for i in range(epoch):
         np.random.shuffle(data)
         k = 0
@@ -64,23 +74,31 @@ def run_train_sample(epoch, M, nn=False):
                 nn.calc_cost()
                 nn.backwards_prop()
                 k += 1
+
             nn.learn_step()
-            z_0[m] = nn.layers[0][0].z
+            zs[m, :] = nn.zs
             theta_0[m] = nn.layers[0][0].theta
-            z_5[m] = nn.layers[0][5].z
             cost.append(np.sum(nn.C)/M)
             batch_cost += np.sum(nn.C)/M
             nn.C = []
+            if inter_plot:
+                ax.plot(range(m), zs[0:m, :])
             print(cost[-1])
             m += 1
         epoch_cost[i] = batch_cost/(N_s/M)
-    plt.plot(np.linspace(0, N_s*epoch/M, epoch), epoch_cost)
-    plt.plot(range(len(theta_0)), theta_0)
-    plt.plot(range(len(z_0)), z_0)
-    plt.plot(range(len(z_5)), z_5)
-    plt.legend(['Cost', 'Theta0', 'Z0', 'Z5'])
-    plt.show()
-    return nn, epoch_cost, z_0, z_5
+        if inter_plot:
+            ax2.plot(range(i), epoch_cost[0:i])
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+    print(time.time() - start_time)
+    if not inter_plot:
+        plt.plot(np.linspace(0, N_s*epoch/M, epoch), epoch_cost)
+        plt.plot(range(len(theta_0)), theta_0)
+        plt.plot(range(len(zs)), zs)
+        plt.legend(['Cost', 'Theta0'])
+        plt.show()
+
+    return nn, epoch_cost, zs
 
 
 def tot_cost(mse):
@@ -88,12 +106,10 @@ def tot_cost(mse):
     return C_0
 
 
-start_time = time.time()
 data = read_dataset("data_set")
-N = 8
-mini_batch = 100
+N = 4
+mini_batch = 50
 
-nn, epoc_cost, z0, z_5 = run_train_sample(10, mini_batch)
-print(time.time() - start_time)
+nn, epoc_cost, zs = run_train_sample(10, mini_batch)
 
 print(1)
