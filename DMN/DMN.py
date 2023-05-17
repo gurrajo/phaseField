@@ -9,7 +9,7 @@ class Branch:
     def __init__(self, child_1, child_2, theta, inp, z):
         self.dC_dZj = 0
         self.dC_dTheta = []
-        self.eta_z = 0.0002
+        self.eta_z = 0.0001
         self.eta_theta = 0.05  # learning rates
         self.input = inp
         self.ch_1 = child_1
@@ -211,7 +211,7 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.lam = 0.3
+        self.lam = 0.25
         self.xi = 0.5
         self.C = []
         self.N = N  # network depth
