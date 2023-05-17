@@ -277,7 +277,7 @@ class Network:
 
     def calc_cost(self):
         D_bar = self.get_comp()
-        self.del_C = (D_bar - self.D_correct)/(np.linalg.norm(self.D_correct, 'fro')**2)  # cost gradient
+        self.del_C = 2*(self.D_correct - D_bar)/(np.linalg.norm(self.D_correct, 'fro')**2)  # cost gradient
         self.C.append(np.linalg.norm((self.D_correct - D_bar), 'fro')**2/np.linalg.norm(D_bar)**2 + self.lam*(np.sum(self.zs) - len(self.zs)*self.xi)**2)
 
     def backwards_prop(self):
