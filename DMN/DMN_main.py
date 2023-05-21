@@ -4,7 +4,6 @@ import DMN
 import matplotlib.pylab as plt
 import time
 import random
-import multiprocessing as mp
 
 
 def write_dmn(dmn, ind):
@@ -72,7 +71,7 @@ def create_dmn_from_save(dmn_file):
     return nn
 
 
-def run_train_sample(epoch, M, nn=False, inter_plot=True, N=False):
+def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
     """
     Train a DMN network for a set of epochs
     :param epoch: amount of epochs, one training session over dataset
@@ -94,20 +93,12 @@ def run_train_sample(epoch, M, nn=False, inter_plot=True, N=False):
     cost = []
     theta_0 = np.zeros((int(epoch * N_s / M), 1))
     zs = np.zeros((int(epoch*N_s/M), 2**(N-1)))
+    thetas = np.zeros((int(epoch*N_s/M), 2**(N-2)))
     m = 0
     epoch_cost = np.zeros((epoch, 1))
     if inter_plot:
         plt.ion()
         fig, axs = plt.subplots(3, 1, constrained_layout=True)
-        axs[0].set_title("z parameters")
-        axs[0].set_xlabel("learning steps")
-        axs[0].set_ylabel("activation")
-        axs[1].set_title("Cost function")
-        axs[1].set_xlabel("Epochs")
-        axs[1].set_ylabel("Error")
-        axs[2].set_title(r"Last layer $\theta$")
-        axs[2].set_xlabel("Learning steps")
-        axs[2].set_ylabel("Rotation angle")
     start_time = time.time()
     for i in range(epoch):
         np.random.shuffle(data)
@@ -126,26 +117,48 @@ def run_train_sample(epoch, M, nn=False, inter_plot=True, N=False):
             nn.learn_step()
             zs[m, :] = nn.zs
             theta_0[m] = nn.layers[-1][0].theta
+            thetas[m, :] = [node.theta for node in nn.layers[0]]
             cost.append(np.sum(nn.C)/M)
             batch_cost += np.sum(nn.C)/M
             nn.C = []
             if inter_plot:
+                axs[0].clear()
+                axs[2].clear()
                 axs[0].plot(range(m), zs[0:m, :])
-                axs[2].plot(range(m), theta_0[0:m])
+                axs[2].plot(range(m), thetas[0:m, :])
             print(cost[-1])
             m += 1
         epoch_cost[i] = batch_cost/(N_s/M)
         if inter_plot:
+            axs[1].clear()
+            axs[0].set_title("z parameters")
+            axs[0].set_xlabel("learning steps")
+            axs[0].set_ylabel("activation")
+            axs[1].set_title("Cost function")
+            axs[1].set_xlabel("Epochs")
+            axs[1].set_ylabel("Error")
+            axs[2].set_title(r"First layer $\theta$")
+            axs[2].set_xlabel("Learning steps")
+            axs[2].set_ylabel("Rotation angle")
             axs[1].plot(range(i), epoch_cost[0:i])
             fig.canvas.draw()
             fig.canvas.flush_events()
     print("runtime: " + str(time.time() - start_time) + " seconds")
-    if not inter_plot:
-        plt.plot(np.linspace(0, N_s*epoch/M, epoch), epoch_cost)
-        plt.plot(range(len(theta_0)), theta_0)
-        plt.plot(range(len(zs)), zs)
-        plt.legend(['Cost', 'Theta0'])
-        plt.show()
+    fig, axs = plt.subplots(3, 1, constrained_layout=True)
+    axs[0].set_title(fr"z parameters $\eta$ = {nn.layers[0][0].eta_z}")
+    axs[0].set_xlabel("learning steps")
+    axs[0].set_ylabel("activation")
+    axs[1].set_title("Cost function")
+    axs[1].set_xlabel("Learnings steps")
+    axs[1].set_ylabel("Error")
+    axs[2].set_title(fr"$\theta$ First layer, $\eta$ = {nn.layers[0][0].eta_theta} ")
+    axs[2].set_xlabel("Learning steps")
+    axs[2].set_ylabel("Rotation angle")
+    axs[1].plot(range(len(cost)), cost)
+    axs[2].plot(range(len(thetas)), thetas)
+    axs[0].plot(range(len(zs)), zs)
+    plt.show()
+    plt.savefig(f"train_sample_{ind}.eps")
 
     return nn, epoch_cost, zs
 
@@ -166,24 +179,26 @@ def run_validation(nn, valid_set):
     cost = np.sum(nn.C)/N_s
     return cost
 
+
 data = read_dataset("data_set")
 new = False
 if new:
     N = 7
     mini_batch = 100
-    nn, epoc_cost, zs = run_train_sample(20, mini_batch)
-    ind = 0
+    ind = 135
+    nn, epoc_cost, zs = run_train_sample(100, mini_batch, ind, N=N, inter_plot=True)
     write_dmn(nn, ind)
 else:
     mini_batch = 50
-    ind = 4
+    ind = 137
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn_old.update_learn_rate(0.1, 0.8)
-    nn_old.lam = 0.2
-    nn, epoc_cost, zs = run_train_sample(40, mini_batch, nn=nn_old)
+    #nn_old.update_learn_rate(0.01, 0.0002)
+    nn_old.lam = 0
+    nn, epoc_cost, zs = run_train_sample(1800, mini_batch, ind, nn=nn_old, inter_plot=True)
     write_dmn(nn, ind+1)
 
 valid_data = read_dataset("validation")
 valid_cost = run_validation(nn, valid_data)
 print("validation cost: " + str(valid_cost))
 print(1)
+

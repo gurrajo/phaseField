@@ -9,8 +9,8 @@ class Branch:
     def __init__(self, child_1, child_2, theta, inp, z):
         self.dC_dZj = 0
         self.dC_dTheta = []
-        self.eta_z = 0.0001
-        self.eta_theta = 0.05  # learning rates
+        self.eta_z = 0.0002
+        self.eta_theta = 0.01  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -119,35 +119,35 @@ class Branch:
         Dr_d_D1[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_1]]
 
         Dr_d_D2 = np.zeros((3,3,3,3))
-        temp[:] = [self.f_1*self.D_1[0,0]**2/self.gamma,
-                                        self.f_2*(-self.D_r[0,1] + self.D_1[0,1]),
-                                        self.f_2*(-self.D_r[0,2] + self.D_1[0,2])]
+        temp[:] = [self.f_2*self.D_1[0,0]**2/self.gamma,
+                                        self.f_1*(-self.D_r[0,1] + self.D_1[0,1]),
+                                        self.f_1*(-self.D_r[0,2] + self.D_1[0,2])]
         Dr_d_D2[:,0,0,0] = 1/self.gamma*temp
-        temp[:] = [self.f_2 * (-self.D_r[0, 1] + self.D_1[0, 1]),
-                                               self.f_1*self.f_2**2*(self.D_2[0,1]-self.D_1[0,1])**2/self.gamma,
-                                               self.f_1*self.f_2**2*(self.D_2[0,2]-self.D_1[0,2])*(self.D_2[0,1]-self.D_1[0,1])/self.gamma]
+        temp[:] = [self.f_1 * (-self.D_r[0, 1] + self.D_1[0, 1]),
+                                               self.f_2*self.f_1**2*(self.D_2[0,1]-self.D_1[0,1])**2/self.gamma,
+                                               self.f_2*self.f_1**2*(self.D_2[0,2]-self.D_1[0,2])*(self.D_2[0,1]-self.D_1[0,1])/self.gamma]
         Dr_d_D2[:, 1, 0, 0] = 1 / self.gamma * temp
-        temp[:] = [self.f_2*(-self.D_r[0,2] + self.D_1[0,2]),
-                                        self.f_1*self.f_2**2*(self.D_2[0,2]-self.D_1[0,2])*(self.D_2[0,1]-self.D_1[0,1])/self.gamma,
-                                        self.f_1*self.f_2**2*(self.D_2[0,2]-self.D_1[0,2])**2/self.gamma]
+        temp[:] = [self.f_1*(-self.D_r[0,2] + self.D_1[0,2]),
+                                        self.f_2*self.f_1**2*(self.D_2[0,2]-self.D_1[0,2])*(self.D_2[0,1]-self.D_1[0,1])/self.gamma,
+                                        self.f_2*self.f_1**2*(self.D_2[0,2]-self.D_1[0,2])**2/self.gamma]
         Dr_d_D2[:,2,0,0] = 1/self.gamma*temp
 
-        Dr_d_D2[:,0,0,1] =[0,self.f_1*self.D_1[0,0]/self.gamma,0]
-        Dr_d_D2[:, 1, 0, 1] =[self.f_1*self.D_1[0,0]/self.gamma,
-                             -2*self.f_1*self.f_2*(self.D_2[0,1] - self.D_1[0,1])/self.gamma,
-                             -self.f_1*self.f_2*(self.D_2[0,2] - self.D_1[0,2])/self.gamma]
-        Dr_d_D2[:, 2, 0, 1] = [0,-self.f_1*self.f_2*(self.D_2[0,2] - self.D_1[0,2])/self.gamma,0]
+        Dr_d_D2[:,0,0,1] =[0,self.f_2*self.D_1[0,0]/self.gamma,0]
+        Dr_d_D2[:, 1, 0, 1] =[self.f_2*self.D_1[0,0]/self.gamma,
+                             -2*self.f_2*self.f_1*(self.D_2[0,1] - self.D_1[0,1])/self.gamma,
+                             -self.f_2*self.f_1*(self.D_2[0,2] - self.D_1[0,2])/self.gamma]
+        Dr_d_D2[:, 2, 0, 1] = [0,-self.f_2*self.f_1*(self.D_2[0,2] - self.D_1[0,2])/self.gamma,0]
         Dr_d_D2[:, :, 1, 0] = Dr_d_D2[:, :, 0, 1]
-        Dr_d_D2[:,0,0,2] =[0,0,self.f_1*self.D_1[0,0]/self.gamma]
-        Dr_d_D2[:, 1, 0, 2] =[0, 0, -self.f_1*self.f_2*(self.D_2[0,1] - self.D_1[0,1])/self.gamma]
-        Dr_d_D2[:, 2, 0, 2] =[self.f_1*self.D_1[0,0]/self.gamma,
-                              -self.f_1*self.f_2*(self.D_2[0,1] - self.D_1[0,1])/self.gamma,
-                              -2*self.f_1*self.f_2*(self.D_2[0,2] - self.D_1[0,2])/self.gamma]
+        Dr_d_D2[:,0,0,2] =[0,0,self.f_2*self.D_1[0,0]/self.gamma]
+        Dr_d_D2[:, 1, 0, 2] =[0, 0, -self.f_2*self.f_1*(self.D_2[0,1] - self.D_1[0,1])/self.gamma]
+        Dr_d_D2[:, 2, 0, 2] =[self.f_2*self.D_1[0,0]/self.gamma,
+                              -self.f_2*self.f_1*(self.D_2[0,1] - self.D_1[0,1])/self.gamma,
+                              -2*self.f_2*self.f_1*(self.D_2[0,2] - self.D_1[0,2])/self.gamma]
         Dr_d_D2[:, :, 2, 0] = Dr_d_D2[:, :, 0, 2]
-        Dr_d_D2[:,:,1,1] = [[0,0,0],[0,self.f_1,0],[0,0,0]]
-        Dr_d_D2[:, :, 1, 2] = [[0, 0, 0], [0, 0, self.f_1], [0, self.f_1, 0]]
+        Dr_d_D2[:,:,1,1] = [[0,0,0],[0,self.f_2,0],[0,0,0]]
+        Dr_d_D2[:, :, 1, 2] = [[0, 0, 0], [0, 0, self.f_2], [0, self.f_2, 0]]
         Dr_d_D2[:, :, 2, 1] = Dr_d_D2[:, :, 1, 2]
-        Dr_d_D2[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_1]]
+        Dr_d_D2[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_2]]
 
         Dr_d_f1 = np.zeros((3,3))
         Dr_d_f1[0,0] = 1/self.gamma*(self.D_1[0,0] - self.D_2[0,0])*self.D_r[0,0]
@@ -211,7 +211,7 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.lam = 0.25
+        self.lam = 0.1
         self.xi = 0.5
         self.C = []
         self.N = N  # network depth
@@ -224,11 +224,11 @@ class Network:
             samples = rng.uniform(size=(2, 1))
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                in_node = Branch(D_1, D_1, samples[0]*np.pi - np.pi/2, True, samples[1]*0.6 + 0.2)
+                in_node = Branch(D_1, D_1, samples[0][0]*np.pi - np.pi/2, True, samples[1][0]*0.6 + 0.2)
                 in_node.D_bar = D_1
             else:
                 # Phase 2 input nodes
-                in_node = Branch(D_2, D_2, samples[0]*np.pi - np.pi/2, True, samples[1]*0.6 + 0.2)
+                in_node = Branch(D_2, D_2, samples[0][0]*np.pi - np.pi/2, True, samples[1][0]*0.6 + 0.2)
                 in_node.D_bar = D_2
             self.input_layer.append(in_node)
 
@@ -246,7 +246,7 @@ class Network:
         rng = np.random.default_rng()
         for j in range(int(len(prev_layer)/2)):
             samples = rng.uniform(size=(1, 1))
-            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1], samples[0]*np.pi - np.pi/2, False, 0))
+            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1], samples[0][0]*np.pi - np.pi/2, False, 0))
         return new_layer
 
     def get_comp(self):
@@ -254,10 +254,10 @@ class Network:
 
     def forward_pass(self):
         for layer in self.layers:
-            for parent in layer:
-                parent.homogen()
-                parent.rotate_comp()
-                parent.gradients()
+            for node in layer:
+                node.homogen()
+                node.rotate_comp()
+                node.gradients()
 
     def update_phases(self, D_1, D_2, DC):
         self.D_correct = DC
@@ -277,7 +277,7 @@ class Network:
 
     def calc_cost(self):
         D_bar = self.get_comp()
-        self.del_C = 2*(self.D_correct - D_bar)/(np.linalg.norm(self.D_correct, 'fro')**2)  # cost gradient
+        self.del_C = 2*(D_bar - self.D_correct)/(np.linalg.norm(self.D_correct, 'fro')**2)  # cost gradient
         self.C.append(np.linalg.norm((self.D_correct - D_bar), 'fro')**2/np.linalg.norm(D_bar)**2 + self.lam*(np.sum(self.zs) - len(self.zs)*self.xi)**2)
 
     def backwards_prop(self):
@@ -312,20 +312,24 @@ class Network:
             parent_node = self.layers[0][parent_ind]
             if parent_node.w == 0:
                 print("w==0")
-            df_dw = -1/parent_node.w
+            if np.mod(j, 2) == 0:
+                df_dw = (1-parent_node.f_1)/parent_node.w
+            else:
+                df_dw = (-parent_node.f_1) / parent_node.w
             alpha = np.zeros((3, 3))
             delta = np.mean(parent_node.delta_batch, 0)
             for k in range(3):
                 for m in range(3):
-                    alpha[k, m] = np.sum(delta[k, m]*parent_node.D_d_Dr[:, :, k, m])
+                    alpha[k, m] = np.sum(delta*parent_node.D_d_Dr[:, :, k, m])
             temp_2 = np.sum(alpha*parent_node.Dr_d_f1)
             dC_dZj = df_dw*temp_2
             node.dC_dZj = dC_dZj
+        for node in self.input_layer:
+            node.update_z(self.lam, self.xi, self.zs)
         for layer in self.layers:
             for node in layer:
                 node.update_theta()
-        for node in self.input_layer:
-            node.update_z(self.lam, self.xi, self.zs)
+                node.delta_batch = []
         self.zs = [np.max([node.z, 0]) for node in self.input_layer]
 
 
