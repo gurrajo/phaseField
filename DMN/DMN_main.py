@@ -1,7 +1,7 @@
 import numpy as np
 import re
 import DMN
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import time
 import random
 
@@ -158,7 +158,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
     axs[2].plot(range(len(thetas)), thetas)
     axs[0].plot(range(len(zs)), zs)
     plt.show()
-    plt.savefig(f"train_sample_{ind}.eps")
+    plt.savefig(f"train_sample_{ind}.svg")
 
     return nn, epoch_cost, zs
 
@@ -181,20 +181,20 @@ def run_validation(nn, valid_set):
 
 
 data = read_dataset("data_set")
-new = False
+new = True
 if new:
     N = 7
     mini_batch = 100
-    ind = 135
-    nn, epoc_cost, zs = run_train_sample(100, mini_batch, ind, N=N, inter_plot=True)
+    ind = 160
+    nn, epoc_cost, zs = run_train_sample(2, mini_batch, ind, N=N, inter_plot=True)
     write_dmn(nn, ind)
 else:
     mini_batch = 50
-    ind = 137
+    ind = 151
     nn_old = create_dmn_from_save(f"DMN_{ind}")
     #nn_old.update_learn_rate(0.01, 0.0002)
-    nn_old.lam = 0
-    nn, epoc_cost, zs = run_train_sample(1800, mini_batch, ind, nn=nn_old, inter_plot=True)
+    nn_old.lam = 0.04
+    nn, epoc_cost, zs = run_train_sample(100, mini_batch, ind, nn=nn_old, inter_plot=True)
     write_dmn(nn, ind+1)
 
 valid_data = read_dataset("validation")
