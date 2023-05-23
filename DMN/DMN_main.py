@@ -18,6 +18,14 @@ def write_dmn(dmn, ind):
         file.writelines(data)
 
 
+def write_data(epoc_cost, zs, thetas, ind):
+    data = []
+    for i,ep_cost in enumerate(epoc_cost):
+        data.append(f"{ep_cost} z:{zs[i,:]} t:{thetas[i,:]}\n")
+    with open(f'data/Outdata_{ind}.txt', 'w') as file:
+        file.writelines(data)
+
+
 def read_dataset(file_name):
     with open(f'data/{file_name}.txt', 'r') as file:
         in_data = file.readlines()
@@ -89,6 +97,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
         print("new network")
     else:
         N = nn.N
+        nn.zs = [node.z for node in nn.input_layer]
         print("old network")
     cost = []
     theta_0 = np.zeros((int(epoch * N_s / M), 1))
@@ -96,6 +105,8 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
     thetas = np.zeros((int(epoch*N_s/M), 2**(N-2)))
     m = 0
     epoch_cost = np.zeros((epoch, 1))
+    epoch_zs = np.zeros((epoch, 2**(N-1)))
+    epoch_thetas = np.zeros((epoch, 2**(N-2)))
     if inter_plot:
         plt.ion()
         fig, axs = plt.subplots(3, 1, constrained_layout=True)
@@ -118,8 +129,8 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
             zs[m, :] = nn.zs
             theta_0[m] = nn.layers[-1][0].theta
             thetas[m, :] = [node.theta for node in nn.layers[0]]
-            cost.append(np.sum(nn.C)/M)
-            batch_cost += np.sum(nn.C)/M
+            cost.append(np.sum(nn.C)/(2*M))
+            batch_cost += np.sum(nn.C)/(2*M)
             nn.C = []
             if inter_plot:
                 axs[0].clear()
@@ -129,6 +140,8 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
             print(cost[-1])
             m += 1
         epoch_cost[i] = batch_cost/(N_s/M)
+        epoch_zs[i, :] = nn.zs
+        epoch_thetas[i, :] = [node.theta for node in nn.layers[0]]
         if inter_plot:
             axs[1].clear()
             axs[0].set_title("z parameters")
@@ -160,7 +173,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False):
     plt.show()
     plt.savefig(f"train_sample_{ind}.svg")
 
-    return nn, epoch_cost, zs
+    return nn, epoch_cost, epoch_cost, epoch_thetas
 
 
 def run_validation(nn, valid_set):
@@ -176,29 +189,30 @@ def run_validation(nn, valid_set):
         nn.update_phases(D1, D2, DC)
         nn.forward_pass()
         nn.calc_cost()
-    cost = np.sum(nn.C)/N_s
+    cost = np.sum(nn.C)//(2*N_s)
     return cost
 
 
 data = read_dataset("data_set")
-new = True
+new = False
 if new:
     N = 7
     mini_batch = 100
-    ind = 160
-    nn, epoc_cost, zs = run_train_sample(2, mini_batch, ind, N=N, inter_plot=True)
+    ind = 30
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(50, mini_batch, ind, N=N, inter_plot=True)
     write_dmn(nn, ind)
+    write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
-    mini_batch = 50
-    ind = 151
+    mini_batch = 100
+    ind = 26
     nn_old = create_dmn_from_save(f"DMN_{ind}")
     #nn_old.update_learn_rate(0.01, 0.0002)
-    nn_old.lam = 0.04
-    nn, epoc_cost, zs = run_train_sample(100, mini_batch, ind, nn=nn_old, inter_plot=True)
+    #nn_old.lam = 0.06
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(50, mini_batch, ind+1, nn=nn_old, inter_plot=True)
     write_dmn(nn, ind+1)
+    write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 
 valid_data = read_dataset("validation")
 valid_cost = run_validation(nn, valid_data)
 print("validation cost: " + str(valid_cost))
 print(1)
-
