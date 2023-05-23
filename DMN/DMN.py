@@ -7,10 +7,10 @@ class Branch:
     The branch is the connection between two child nodes and one parent node
     """
     def __init__(self, child_1, child_2, theta, inp, z):
-        self.alpha = np.zeros((3,3))
+        self.alpha = np.zeros((3, 3))
         self.dC_dZj = []
         self.dC_dTheta = []
-        self.eta_z = 0.001
+        self.eta_z = 0.002
         self.eta_theta = 0.01  # learning rates
         self.input = inp
         self.ch_1 = child_1
@@ -73,7 +73,7 @@ class Branch:
 
     def gradients(self):
         # derivative of D comps with respect to D_r
-        D_d_Dr = np.zeros((3,3,3,3))
+        D_d_Dr = np.zeros((3, 3, 3, 3))
         R_1 = self.rot_mat(-self.theta)
         R_2 = self.rot_mat(self.theta)
         for i in range(3):
@@ -119,37 +119,37 @@ class Branch:
         Dr_d_D1[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_1]]
 
         Dr_d_D2 = np.zeros((3, 3, 3, 3))
-        temp[:] = [self.f_2 * self.D_1[0, 0] ** 2 / self.gamma,
-                   self.f_1 * (-self.D_r[0, 1] + self.D_1[0, 1]),
-                   self.f_1 * (-self.D_r[0, 2] + self.D_1[0, 2])]
+        temp[:] = [self.f_1 * self.D_1[0, 0] ** 2 / self.gamma,
+                   self.f_2 * (-self.D_r[0, 1] + self.D_1[0, 1]),
+                   self.f_2 * (-self.D_r[0, 2] + self.D_1[0, 2])]
         Dr_d_D2[:, 0, 0, 0] = 1 / self.gamma * temp
-        temp[:] = [self.f_1 * (-self.D_r[0, 1] + self.D_1[0, 1]),
-                   self.f_2 * self.f_1 ** 2 * (self.D_2[0, 1] - self.D_1[0, 1]) ** 2 / self.gamma,
-                   self.f_2 * self.f_1 ** 2 * (self.D_2[0, 2] - self.D_1[0, 2]) * (
+        temp[:] = [self.f_2 * (-self.D_r[0, 1] + self.D_1[0, 1]),
+                   self.f_1 * self.f_2 ** 2 * (self.D_2[0, 1] - self.D_1[0, 1]) ** 2 / self.gamma,
+                   self.f_1 * self.f_2 ** 2 * (self.D_2[0, 2] - self.D_1[0, 2]) * (
                                self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma]
         Dr_d_D2[:, 1, 0, 0] = 1 / self.gamma * temp
-        temp[:] = [self.f_1 * (-self.D_r[0, 2] + self.D_1[0, 2]),
-                   self.f_2 * self.f_1 ** 2 * (self.D_2[0, 2] - self.D_1[0, 2]) * (
+        temp[:] = [self.f_2 * (-self.D_r[0, 2] + self.D_1[0, 2]),
+                   self.f_1 * self.f_2 ** 2 * (self.D_2[0, 2] - self.D_1[0, 2]) * (
                                self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma,
-                   self.f_2 * self.f_1 ** 2 * (self.D_2[0, 2] - self.D_1[0, 2]) ** 2 / self.gamma]
+                   self.f_1 * self.f_2 ** 2 * (self.D_2[0, 2] - self.D_1[0, 2]) ** 2 / self.gamma]
         Dr_d_D2[:, 2, 0, 0] = 1 / self.gamma * temp
 
-        Dr_d_D2[:, 0, 0, 1] = [0, self.f_2 * self.D_1[0, 0] / self.gamma, 0]
-        Dr_d_D2[:, 1, 0, 1] = [self.f_2 * self.D_1[0, 0] / self.gamma,
-                               -2 * self.f_2 * self.f_1 * (self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma,
-                               -self.f_2 * self.f_1 * (self.D_2[0, 2] - self.D_1[0, 2]) / self.gamma]
-        Dr_d_D2[:, 2, 0, 1] = [0, -self.f_2 * self.f_1 * (self.D_2[0, 2] - self.D_1[0, 2]) / self.gamma, 0]
+        Dr_d_D2[:, 0, 0, 1] = [0, self.f_1 * self.D_1[0, 0] / self.gamma, 0]
+        Dr_d_D2[:, 1, 0, 1] = [self.f_1 * self.D_1[0, 0] / self.gamma,
+                               -2 * self.f_1 * self.f_2 * (self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma,
+                               -self.f_1 * self.f_2 * (self.D_2[0, 2] - self.D_1[0, 2]) / self.gamma]
+        Dr_d_D2[:, 2, 0, 1] = [0, -self.f_1 * self.f_2 * (self.D_2[0, 2] - self.D_1[0, 2]) / self.gamma, 0]
         Dr_d_D2[:, :, 1, 0] = Dr_d_D2[:, :, 0, 1]
-        Dr_d_D2[:, 0, 0, 2] = [0, 0, self.f_2 * self.D_1[0, 0] / self.gamma]
-        Dr_d_D2[:, 1, 0, 2] = [0, 0, -self.f_2 * self.f_1 * (self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma]
-        Dr_d_D2[:, 2, 0, 2] = [self.f_2 * self.D_1[0, 0] / self.gamma,
-                               -self.f_2 * self.f_1 * (self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma,
-                               -2 * self.f_2 * self.f_1 * (self.D_2[0, 2] - self.D_1[0, 2]) / self.gamma]
+        Dr_d_D2[:, 0, 0, 2] = [0, 0, self.f_1 * self.D_1[0, 0] / self.gamma]
+        Dr_d_D2[:, 1, 0, 2] = [0, 0, -self.f_1 * self.f_2 * (self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma]
+        Dr_d_D2[:, 2, 0, 2] = [self.f_1 * self.D_1[0, 0] / self.gamma,
+                               -self.f_1 * self.f_2 * (self.D_2[0, 1] - self.D_1[0, 1]) / self.gamma,
+                               -2 * self.f_1 * self.f_2 * (self.D_2[0, 2] - self.D_1[0, 2]) / self.gamma]
         Dr_d_D2[:, :, 2, 0] = Dr_d_D2[:, :, 0, 2]
-        Dr_d_D2[:, :, 1, 1] = [[0, 0, 0], [0, self.f_2, 0], [0, 0, 0]]
-        Dr_d_D2[:, :, 1, 2] = [[0, 0, 0], [0, 0, self.f_2], [0, self.f_2, 0]]
+        Dr_d_D2[:, :, 1, 1] = [[0, 0, 0], [0, self.f_1, 0], [0, 0, 0]]
+        Dr_d_D2[:, :, 1, 2] = [[0, 0, 0], [0, 0, self.f_1], [0, self.f_1, 0]]
         Dr_d_D2[:, :, 2, 1] = Dr_d_D2[:, :, 1, 2]
-        Dr_d_D2[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_2]]
+        Dr_d_D2[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_1]]
 
         Dr_d_f1 = np.zeros((3,3))
         Dr_d_f1[0,0] = 1/self.gamma*(self.D_1[0,0] - self.D_2[0,0])*self.D_r[0,0]
@@ -212,7 +212,7 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.lam = 0.06
+        self.lam = 0.08
         self.xi = 0.5
         self.C = []
         self.N = N  # network depth
@@ -278,8 +278,8 @@ class Network:
 
     def calc_cost(self):
         D_bar = self.get_comp()
-        self.del_C = (D_bar - self.D_correct)/((np.linalg.norm(self.D_correct, 'fro'))**2)  # cost gradient
-        self.C.append(((np.linalg.norm((self.D_correct - D_bar), 'fro'))**2)/((np.linalg.norm(D_bar))**2)*2 + self.lam*(np.sum(self.zs) - len(self.zs)*self.xi)**2)
+        self.del_C = (self.D_correct - D_bar)/((np.linalg.norm(self.D_correct, 'fro'))**2)  # cost gradient
+        self.C.append(((np.linalg.norm((self.D_correct - D_bar), 'fro'))**2)/((np.linalg.norm(D_bar))**2) + self.lam * (np.sum(self.zs) - len(self.zs)*self.xi)**2)
 
     def backwards_prop(self):
         for i, layer in enumerate(reversed(self.layers)):
@@ -310,27 +310,22 @@ class Network:
             if node.z <= 0:
                 node.dC_dZj = 0
                 continue
+            N = self.N - 2
+            in_node_ind = j + 1
             parent_ind = int((j - np.mod(j, 2)) / 2)
             parent_node = self.layers[0][parent_ind]
-            if np.mod(j, 2) == 0:
-                df_dw = 1 / parent_node.w
-                node.dC_dZj.append(np.sum(parent_node.alpha*parent_node.Dr_d_f1)*df_dw)
-                continue
-            N = self.N
-            in_node_ind = j + 1
-            for i, layer in enumerate(self.layers):
+            df_dw = (1 - parent_node.f_1)/parent_node.w
+            dC_dZj = np.sum(parent_node.alpha * parent_node.Dr_d_f1) * df_dw
+            for i, layer in enumerate(self.layers[0:-1]):
                 layer_ind = N - i
-                if layer_ind == N:
-                    df_dw = - parent_node.f_1 / parent_node.w
-                    dC_dZj = np.sum(parent_node.alpha*parent_node.Dr_d_f1)*df_dw
                 for m, node_2 in enumerate(layer):
                     node_ind = m + 1
                     parent_ind_2 = int((m - np.mod(m, 2)) / 2)
-                    parent_node_2 = self.layers[0][parent_ind_2]
-                    if node_ind * 2 ** (N-layer_ind) == in_node_ind:
-                        df_dw = 1/parent_node_2.w
-                    elif (parent_ind_2+1) * 2 ** (N-layer_ind) == in_node_ind:
-                        df_dw = - parent_node_2.f_1 / parent_node_2.w
+                    parent_node_2 = self.layers[i+1][parent_ind_2]
+                    if node_ind == np.ceil(in_node_ind/(2**(N-layer_ind))):
+                        df_dw = (1 - parent_node.f_1)/parent_node.w
+                    elif parent_ind_2 + 1 == np.ceil(in_node_ind/(2**(N-layer_ind))):
+                        df_dw = - parent_node.f_1 / parent_node.w
                     else:
                         df_dw = 0
                     dC_dZj += np.sum(parent_node_2.alpha * parent_node_2.Dr_d_f1) * df_dw
