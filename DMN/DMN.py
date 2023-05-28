@@ -10,12 +10,12 @@ class Branch:
         self.alpha = np.zeros((3, 3))
         self.dC_dZj = []
         self.dC_dTheta = []
-        self.c_theta = 0.5  # RMSprop parameter
-        self.c_z = 0.5  # RMSprop parameter
+        self.c_theta = 0.1  # RMSprop parameter
+        self.c_z = 0.1  # RMSprop parameter
         self.learn_z = 0
         self.learn_theta = 0
-        self.eta_z = 0.0005
-        self.eta_theta = 0.01  # learning rates
+        self.eta_z = 0.01
+        self.eta_theta = 0.02  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -177,10 +177,11 @@ class Branch:
         self.Dr_d_f1 = Dr_d_f1
 
     def update_theta(self):
-        gamma = 0.9
-        self.c_theta = self.c_theta * gamma + (1 - gamma) * (np.mean(self.dC_dTheta)) ** 2
+        gamma = 0.925
+        self.c_theta = self.c_theta * gamma + (1 - gamma) * ((np.mean(self.dC_dTheta)) ** 2)
         learn = self.eta_theta / (np.sqrt(self.c_theta) + 1E-6)
-        self.theta -= learn * np.mean(self.dC_dTheta)
+        self.learn_theta = np.min([learn, 1])
+        self.theta += self.learn_theta * np.mean(self.dC_dTheta)
         self.dC_dTheta = []
 
     def update_z(self, lam, xi, zs):
@@ -192,11 +193,11 @@ class Branch:
         if self.z <= 0:
             self.z = 0
         else:
-            gamma = 0.9
-            self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj))**2
+            gamma = 0.925
+            self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj) + dL_d_Z)**2
             learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
             self.learn_z = np.min([learn, 1])
-            self.z -= self.learn_z*(np.mean(self.dC_dZj) + dL_d_Z)
+            self.z += self.learn_z*(np.mean(self.dC_dZj) - dL_d_Z)
         self.w = np.max([self.z, 0])
         self.dC_dZj = []
 
@@ -219,7 +220,7 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.lam = 0.25
+        self.lam = 0.9
         self.xi = 0.5
         self.C = []
         self.N = N  # network depth
@@ -254,7 +255,7 @@ class Network:
         rng = np.random.default_rng()
         for j in range(int(len(prev_layer)/2)):
             samples = rng.uniform(size=(1, 1))
-            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1], samples[0][0]*np.pi - np.pi/2, False, 0))
+            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1], (samples[0][0]*np.pi - np.pi/2), False, 0))
         return new_layer
 
     def get_comp(self):
@@ -286,7 +287,7 @@ class Network:
     def calc_cost(self):
         D_bar = self.get_comp()
         self.del_C = (self.D_correct - D_bar)/((np.linalg.norm(self.D_correct, 'fro'))**2)  # cost gradient
-        self.C.append(((np.linalg.norm((self.D_correct - D_bar), 'fro'))**2)/((np.linalg.norm(D_bar))**2) + self.lam * (np.sum(self.zs) - len(self.zs)*self.xi)**2)
+        self.C.append(((np.linalg.norm((self.D_correct - D_bar), 'fro'))**2)/((np.linalg.norm(D_bar))**2)) # + (self.lam * ((np.sum(self.zs) - len(self.zs)*self.xi)**2)))
 
     def backwards_prop(self):
         for i, layer in enumerate(reversed(self.layers)):

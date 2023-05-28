@@ -3,7 +3,25 @@ import re
 import DMN
 import matplotlib.pyplot as plt
 import time
-import random
+
+
+def file_reader(filename):
+    f = open(filename, 'r')
+    Lines = f.readlines()
+    line = []
+    for Line in Lines:
+        nums = Line.split("#")
+        points = []
+        for num in nums:
+            if num == "\n":
+                line.append([points])
+                break
+            point = num.replace("[", '')
+            point = point.replace("]",'')
+            point = point.split(",")
+            points.append([float(point[0]), float(point[1])])
+    f.close()
+    return line
 
 
 def write_dmn(dmn, ind):
@@ -35,6 +53,27 @@ def read_dataset(file_name):
         nums = [float(val) for val in s_out]
         data[i] = nums
     return data
+
+
+def make_dataset_sym(data):
+    sym_data = []
+    for i in range(200):
+        data_line = data[i,:]
+        d_corr = data[i, 19:28]
+        d_21 = (d_corr[1] + d_corr[3])/2
+        d_31 = (d_corr[2] + d_corr[6])/2
+        d_32 = (d_corr[5] + d_corr[7])/2
+        d_corr[1] = d_21
+        d_corr[3] = d_21
+        d_corr[2] = d_31
+        d_corr[6] = d_31
+        d_corr[5] = d_32
+        d_corr[7] = d_32
+        data_line[19:28] = d_corr
+        data_string = ' '.join(str(x) for x in data_line)
+        sym_data.append(f"{data_string}\n")
+    with open(f'data/Symdata2.txt', 'w') as file:
+        file.writelines(sym_data)
 
 
 def extract_D_mat(data, ind):
@@ -88,7 +127,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     :param inter_plot: interactive plotting on or off.
     :return: Trained network object. Epoch averaged cost. z activations for each training step.
     """
-    N_s = 800
+    N_s = 200
     if not nn:
         D1 = np.zeros((3, 3))
         D2 = np.zeros((3, 3))
@@ -102,7 +141,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     cost = []
     theta_0 = np.zeros((int(epoch * N_s / M), 1))
     zs = np.zeros((int(epoch*N_s/M), 2**(N-1)))
-    cs = np.zeros((int(epoch * N_s / M), 2 ** (N - 1)))
+    cs = np.zeros((int(epoch * N_s / M), 2 ** (N - 2)))
     thetas = np.zeros((int(epoch*N_s/M), 2**(N-2)))
     m = 0
     epoch_cost = np.zeros((epoch, 1))
@@ -111,14 +150,14 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     if inter_plot:
         plt.ion()
         fig, axs = plt.subplots(4, 1, constrained_layout=True)
-        axs[1].yscale("log")
+        fig.suptitle(f"N_s = {N_s}")
     start_time = time.time()
     for i in range(epoch):
         if update_lam:
             if i == 20:
-                nn.lam = 0.15
+                nn.lam = 0.005
             if i == 50:
-                nn.lam = 0.10
+                nn.lam = 0
             if i == 100:
                 nn.lam = 0
         np.random.shuffle(data)
@@ -131,12 +170,12 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
                 nn.update_phases(D1, D2, DC)
                 nn.forward_pass()
                 nn.calc_cost()
-                nn.backwards_prop_2()
+                nn.backwards_prop()
                 k += 1
 
             nn.learn_step()
             zs[m, :] = nn.zs
-            cs[m, :] = [node.learn_z for node in nn.input_layer]
+            cs[m, :] = [node.learn_theta for node in nn.layers[0]]
             theta_0[m] = nn.layers[-1][0].theta
             thetas[m, :] = [node.theta for node in nn.layers[0]]
             cost.append(np.sum(nn.C)/(2*M))
@@ -146,6 +185,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
                 axs[0].clear()
                 axs[2].clear()
                 axs[3].clear()
+
                 axs[0].plot(range(m), zs[0:m, :])
                 axs[2].plot(range(m), thetas[0:m, :])
                 axs[3].plot(range(m), cs[0:m, :])
@@ -162,16 +202,16 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
             axs[1].set_title("Cost function")
             axs[1].set_xlabel("Epochs")
             axs[1].set_ylabel("Error")
-
             axs[2].set_title(r"First layer $\theta$")
             axs[2].set_xlabel("Learning steps")
             axs[2].set_ylabel("Rotation angle")
-            axs[3].set_title(r"z learn rate")
+            axs[3].set_title(fr"$\theta$ learn rate")
             axs[3].set_xlabel("Learning steps")
-            axs[3].set_ylabel(r"\eta")
+            axs[3].set_ylabel(fr"$\eta$")
             axs[1].plot(range(i), epoch_cost[0:i])
             fig.canvas.draw()
             fig.canvas.flush_events()
+    plt.savefig(f"train_sample_{ind}_run.svg")
     print("runtime: " + str(time.time() - start_time) + " seconds")
     fig, axs = plt.subplots(3, 1, constrained_layout=True)
     axs[0].set_title(fr"z parameters $\eta$ = {nn.layers[0][0].eta_z}")
@@ -187,7 +227,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     axs[2].plot(range(len(thetas)), thetas)
     axs[0].plot(range(len(zs)), zs)
     plt.show()
-    plt.savefig(f"train_sample_{ind}.svg")
+    plt.savefig(f"train_sample_{ind}_ext.svg")
 
     return nn, epoch_cost, epoch_zs, epoch_thetas
 
@@ -209,22 +249,22 @@ def run_validation(nn, valid_set):
     return cost
 
 
-data = read_dataset("data_set")
+data = read_dataset("Symdata2")
 new = True
 if new:
     N = 7
-    mini_batch = 100
-    ind = 55
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind, N=N, inter_plot=True)
+    mini_batch = 50
+    ind = 100
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(4000, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
     mini_batch = 50
-    ind = 46
+    ind = 90
     nn_old = create_dmn_from_save(f"DMN_{ind}")
     #nn_old.update_learn_rate(0.01, 0.0002)
-    nn_old.lam = 0
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(500, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    #nn_old.lam = 0
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 
