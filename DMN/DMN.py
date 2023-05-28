@@ -10,12 +10,12 @@ class Branch:
         self.alpha = np.zeros((3, 3))
         self.dC_dZj = []
         self.dC_dTheta = []
-        self.c_theta = 0.1  # RMSprop parameter
-        self.c_z = 0.1  # RMSprop parameter
+        self.c_theta = 0.2  # RMSprop parameter
+        self.c_z = 0.2  # RMSprop parameter
         self.learn_z = 0
         self.learn_theta = 0
-        self.eta_z = 0.01
-        self.eta_theta = 0.02  # learning rates
+        self.eta_z = 0.005
+        self.eta_theta = 0.005  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -177,7 +177,7 @@ class Branch:
         self.Dr_d_f1 = Dr_d_f1
 
     def update_theta(self):
-        gamma = 0.925
+        gamma = 0.95
         self.c_theta = self.c_theta * gamma + (1 - gamma) * ((np.mean(self.dC_dTheta)) ** 2)
         learn = self.eta_theta / (np.sqrt(self.c_theta) + 1E-6)
         self.learn_theta = np.min([learn, 1])
@@ -193,7 +193,7 @@ class Branch:
         if self.z <= 0:
             self.z = 0
         else:
-            gamma = 0.925
+            gamma = 0.95
             self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj) + dL_d_Z)**2
             learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
             self.learn_z = np.min([learn, 1])

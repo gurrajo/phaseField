@@ -150,7 +150,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     if inter_plot:
         plt.ion()
         fig, axs = plt.subplots(4, 1, constrained_layout=True)
-        fig.suptitle(f"N_s = {N_s}")
+        fig.suptitle(fr"N_s = {N_s}, $\lambda$ = {nn.lam}")
     start_time = time.time()
     for i in range(epoch):
         if update_lam:
