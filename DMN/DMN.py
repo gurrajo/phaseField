@@ -169,7 +169,7 @@ class Branch:
                     self.f_1 ** 2 * self.D_2[0, 0] - self.f_2 ** 2 * self.D_1[0, 0]) * (
                                     self.D_1[0, 2] - self.D_2[0, 2]) ** 2
 
-        self.D_d_theta = np.matmul(np.matmul(-self.rot_mat_prime(-self.theta), self.D_bar), self.rot_mat(self.theta)) + np.matmul(np.matmul(self.rot_mat(-self.theta), self.D_bar), self.rot_mat_prime(self.theta))
+        self.D_d_theta = -np.matmul(np.matmul(self.rot_mat_prime(-self.theta), self.D_r), self.rot_mat(self.theta)) + np.matmul(np.matmul(self.rot_mat(-self.theta), self.D_r), self.rot_mat_prime(self.theta))
 
         self.Dr_d_D1 = Dr_d_D1
         self.Dr_d_D2 = Dr_d_D2
@@ -286,7 +286,7 @@ class Network:
 
     def calc_cost(self):
         D_bar = self.get_comp()
-        self.del_C = (self.D_correct - D_bar)/((np.linalg.norm(self.D_correct, 'fro'))**2)  # cost gradient
+        self.del_C = (D_bar - self.D_correct)/((np.linalg.norm(self.D_correct, 'fro'))**2)  # cost gradient
         self.C.append(((np.linalg.norm((self.D_correct - D_bar), 'fro'))**2)/((np.linalg.norm(D_bar))**2)) # + (self.lam * ((np.sum(self.zs) - len(self.zs)*self.xi)**2)))
 
     def backwards_prop(self):
