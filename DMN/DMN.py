@@ -181,7 +181,7 @@ class Branch:
         self.c_theta = self.c_theta * gamma + (1 - gamma) * ((np.mean(self.dC_dTheta)) ** 2)
         learn = self.eta_theta / (np.sqrt(self.c_theta) + 1E-6)
         self.learn_theta = np.min([learn, 1])
-        self.theta += self.learn_theta * np.mean(self.dC_dTheta)
+        self.theta -= self.learn_theta * np.mean(self.dC_dTheta)
         self.dC_dTheta = []
 
     def update_z(self, lam, xi, zs):
@@ -197,7 +197,7 @@ class Branch:
             self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj) + dL_d_Z)**2
             learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
             self.learn_z = np.min([learn, 1])
-            self.z += self.learn_z*(np.mean(self.dC_dZj) - dL_d_Z)
+            self.z -= self.learn_z*(np.mean(self.dC_dZj) - dL_d_Z)
         self.w = np.max([self.z, 0])
         self.dC_dZj = []
 
