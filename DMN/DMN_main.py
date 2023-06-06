@@ -158,7 +158,8 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
         plt.ion()
         fig, axs = plt.subplots(4, 1, constrained_layout=True)
         fig.suptitle(fr"N_s = {N_s}, $\lambda$ = {nn.lam}")
-        fig.set_dpi(100)
+        fig.set_size_inches(17, 12, forward=True)
+        axs[1].set_yscale("log")
     start_time = time.time()
     for i in range(epoch):
         if update_lam:
@@ -202,13 +203,15 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
                 axs[3].plot(range(m), cs[0:m, :])
             print(cost[-1])
             m += 1
+
         epoch_cost[i] = batch_cost/(N_s/M)
         epoch_cost_0[i] = batch_cost_0/(N_s/M)
         epoch_zs[i, :] = nn.zs
         epoch_thetas[i, :] = [node.theta for node in nn.input_layer]
         if inter_plot:
             axs[1].clear()
-            axs[0].set_title(f"z's, deactivated nodes: {nn.zs.count(0)}/{len(nn.zs)}")
+            axs[1].set_yscale("log")
+            axs[0].set_title(f"z, deactivated nodes: {nn.zs.count(0)}/{len(nn.zs)}")
             axs[0].set_xlabel("learning steps")
             axs[0].set_ylabel("activation")
             axs[1].set_title("Cost function")
@@ -242,7 +245,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     plt.show()
     plt.savefig(f"train_sample_{ind}_ext.svg")
 
-    return nn, epoch_cost, epoch_zs, epoch_thetas
+    return nn, epoch_cost_0, epoch_zs, epoch_thetas
 
 
 def run_validation(nn, valid_set):
@@ -263,21 +266,22 @@ def run_validation(nn, valid_set):
 
 
 data = read_dataset("Symdata2")
-new = False
+new = True
+
 if new:
     N = 8
-    mini_batch = 50
-    ind = 135
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    mini_batch = 25
+    ind = 30
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(800, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
     mini_batch = 50
-    ind = 132
+    ind = 26
     nn_old = create_dmn_from_save(f"DMN_{ind}")
     #nn_old.update_learn_rate(0.01, 0.0002)
     #nn_old.lam = 0
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(4000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(2000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 

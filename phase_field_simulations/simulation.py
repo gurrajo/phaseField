@@ -68,7 +68,7 @@ if 'is_test_run' in globals():
     result = None
 else:
     field = timeloop()
-ident = "A_1-5_k2_1-2MP-s"
+ident = "A_1-5_k2_1-2MP-s_4"
 f_min, f_max = np.min(field), np.max(field)
 field = (field - f_min) / (f_max - f_min)
 x = np.linspace(0,255,256)
@@ -76,7 +76,7 @@ x = np.linspace(0,255,256)
 cs = plt.contour(field,levels=[0.5])
 plt.savefig(ident+'contour_plot.png')
 a = cs.collections[0].get_paths()
-f = open("myfile.txt", 'w')
+f = open("myfile_4.txt", 'w')
 
 
 for i,cnt in enumerate(a):
