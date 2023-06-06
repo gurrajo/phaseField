@@ -185,12 +185,20 @@ class Branch:
 
         self.Dr_d_D1 = Dr_d_D1
         self.Dr_d_D2 = Dr_d_D2
-        self.D_d_Dr = D_d_Dr
         self.Dr_d_f1 = Dr_d_f1
         self.Dr_d_f2 = Dr_d_f2
 
     def theta_grad(self):
         self.D_d_theta = -np.matmul(np.matmul(self.rot_mat_prime(-self.theta), self.D_r), self.rot_mat(self.theta)) + np.matmul(np.matmul(self.rot_mat(-self.theta), self.D_r), self.rot_mat_prime(self.theta))
+        D_d_Dr = np.zeros((3, 3, 3, 3))
+        R_1 = self.rot_mat(-self.theta)
+        R_2 = self.rot_mat(self.theta)
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    for l in range(3):
+                        D_d_Dr[i,j,k,l] = R_1[i,k]*R_2[l,j]
+        self.D_d_Dr = D_d_Dr
 
     def update_theta(self):
         gamma = 0.985
@@ -347,16 +355,20 @@ class Network:
                 parent_ind = int((j - np.mod(j, 2)) / 2)
                 parent_node = self.layers[0][parent_ind]
                 if np.mod(j, 2) == 0:
-                    df_dw = 1
+                    #df_dw = 1
                     delta_new = parent_node.calc_delta(True)
-                    dC_dZj = np.sum(parent_node.alpha * parent_node.Dr_d_f1) * df_dw
+                    #dC_dZj = np.sum(parent_node.alpha * parent_node.Dr_d_f1) * df_dw
                 else:
-                    df_dw = 1
+                    #df_dw = 1
                     delta_new = parent_node.calc_delta(False)
-                    dC_dZj = np.sum(parent_node.alpha * parent_node.Dr_d_f2) * df_dw
-                dC_dZj = np.sum(delta_new)
-                node.dC_dZj.append(dC_dZj)
+                    #dC_dZj = np.sum(parent_node.alpha * parent_node.Dr_d_f2) * df_dw
+                alpha = np.zeros((3, 3))
                 node.theta_grad()
+                for n in range(3):
+                    for l in range(3):
+                        alpha[n, l] = np.sum(delta_new * node.D_d_Dr[:, :, n, l])
+                dC_dZj = np.sum(alpha)
+                node.dC_dZj.append(dC_dZj)
                 dC_d_theta = np.sum(delta_new * node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
 

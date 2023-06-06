@@ -10,12 +10,12 @@ class Branch:
         self.alpha = np.zeros((3, 3))
         self.dC_dZj = []
         self.dC_dTheta = []
-        self.c_theta = 0.1  # RMSprop parameter
-        self.c_z = 0.1  # RMSprop parameter
+        self.c_theta = 0.01  # RMSprop parameter
+        self.c_z = 0.05  # RMSprop parameter
         self.learn_z = 0
         self.learn_theta = 0
         self.eta_z = 0.001
-        self.eta_theta = 0.001  # learning rates
+        self.eta_theta = 0.005  # learning rates
         self.ch_1 = child_1
         self.ch_2 = child_2
         self.theta = theta
@@ -176,10 +176,10 @@ class Branch:
         self.D_d_Dr = D_d_Dr
 
     def update_theta(self):
-        gamma = 0.985
+        gamma = 0.99
         self.c_theta = self.c_theta * gamma + (1 - gamma) * ((np.mean(self.dC_dTheta)) ** 2)
         learn = self.eta_theta / (np.sqrt(self.c_theta) + 1E-6)
-        self.learn_theta = np.min([learn, 0.4])
+        self.learn_theta = np.min([learn, 0.1])
         self.theta -= self.learn_theta * np.median(self.dC_dTheta)
         if self.theta > np.pi/2:
             self.theta -= np.pi
@@ -195,10 +195,11 @@ class Branch:
         if self.z <= 0:
             self.z = 0
         else:
-            gamma = 0.985
-            self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj))**2
-            learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
-            self.learn_z = np.min([learn, 0.1])
+            gamma = 0.99
+            #self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj))**2
+            #learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
+            #self.learn_z = np.min([learn, 0.05])
+            self.learn_z = 0.01
             self.z -= self.learn_z*(np.mean(self.dC_dZj))
             if self.z <= 0:
                 self.z = 0
@@ -317,7 +318,7 @@ class Network:
                 node.alpha = alpha
                 dC_d_theta = np.sum(delta_new*node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
-                #dC_dZj = np.sum(alpha)
+                #dC_dZj = np.sum(alpha*node.D_r)
                 #node.dC_dZj.append(dC_dZj)
             prev_layer = layer
         for j, node in enumerate(self.input_layer):
@@ -331,12 +332,13 @@ class Network:
                     delta_new = parent_node.calc_delta(True)
                 else:
                     delta_new = parent_node.calc_delta(False)
-                node.theta_grad()
                 alpha = np.zeros((3, 3))
+                node.theta_grad()
                 for n in range(3):
                     for l in range(3):
                         alpha[n, l] = np.sum(delta_new * node.D_d_Dr[:, :, n, l])
-                dC_dZj = np.sum(delta_new)
+
+                dC_dZj = np.sum(alpha*node.D_r)
                 node.dC_dZj.append(dC_dZj)
 
                 dC_d_theta = np.sum(delta_new * node.D_d_theta)

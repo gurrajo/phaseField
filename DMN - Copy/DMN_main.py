@@ -267,10 +267,10 @@ data = read_dataset("Symdata2")
 new = True
 
 if new:
-    N = 6
+    N = 8
     mini_batch = 25
-    ind = 40
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    ind = 50
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(200, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:

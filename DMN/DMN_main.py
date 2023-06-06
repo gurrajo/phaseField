@@ -266,7 +266,7 @@ def run_validation(nn, valid_set):
 
 
 data = read_dataset("Symdata2")
-new = True
+new = False
 
 if new:
     N = 8
@@ -276,12 +276,10 @@ if new:
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
-    mini_batch = 50
-    ind = 26
+    mini_batch = 25
+    ind = 30
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    #nn_old.update_learn_rate(0.01, 0.0002)
-    #nn_old.lam = 0
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(2000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(500, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 
