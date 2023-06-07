@@ -7,12 +7,13 @@ class Branch:
     The branch is the connection between two child nodes and one parent node
     """
     def __init__(self, child_1, child_2, theta, inp, w):
+        self.inp = inp
         self.alpha = np.zeros((3, 3))
-        self.dC_dZj = []
+        self.dC_dW = []
         self.dC_dTheta = []
         self.c_theta = 0.01  # RMSprop parameter
         self.c_z = 0.05  # RMSprop parameter
-        self.learn_z = 0
+        self.learn_w = 0
         self.learn_theta = 0
         self.eta_z = 0.001
         self.eta_theta = 0.005  # learning rates
@@ -22,7 +23,6 @@ class Branch:
         self.D_r = np.zeros((3, 3))  # output compliance before rotation
         self.D_bar = np.zeros((3, 3))  # output compliance after rotation
         self.delta = np.zeros((3, 3))
-        self.z = w
         self.w = w
         if not inp:
             self.f_1 = self.ch_1.w/(self.ch_1.w + self.ch_2.w)
@@ -32,7 +32,6 @@ class Branch:
             self.f_2 = 0
 
     def homogen(self):
-
         if (self.ch_1.w + self.ch_2.w) == 0:
             self.f_1 = 0
         else:
@@ -157,6 +156,43 @@ class Branch:
         Dr_d_D2[:, :, 2, 1] = Dr_d_D2[:, :, 1, 2]
         Dr_d_D2[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, self.f_2]]
 
+        Dr_d_f1 = np.zeros((3, 3))
+        Dr_d_f1[0, 0] = (self.D_1[0, 0] - self.D_2[0, 0]) * (self.D_1[0, 0] * self.D_2[0, 0]) / self.gamma ** 2
+        Dr_d_f1[0, 1] = (self.D_1[0, 0] * self.D_2[0, 0] * (self.D_1[0, 1] - self.D_2[0, 1])) / self.gamma ** 2
+        Dr_d_f1[1, 0] = Dr_d_f1[0, 1]
+        Dr_d_f1[0, 2] = (self.D_1[0, 0] * self.D_2[0, 0] * (self.D_1[0, 2] - self.D_2[0, 2])) / self.gamma ** 2
+        Dr_d_f1[2, 0] = Dr_d_f1[0, 2]
+        Dr_d_f1[1, 1] = self.D_1[1, 1] - self.D_2[1, 1] - ((self.D_1[0, 1] - self.D_2[0, 1]) ** 2 * (
+                    self.D_1[0, 0] * (self.f_1 ** 2 - 2 * self.f_1 + 1) - self.D_2[
+                0, 0] * self.f_1 ** 2)) / self.gamma ** 2
+        Dr_d_f1[1, 2] = self.D_1[1, 2] - self.D_2[1, 2] - (
+                    (self.D_1[0, 1] - self.D_2[0, 1]) * (self.D_1[0, 2] - self.D_2[0, 2]) * (
+                        self.D_1[0, 0] * (self.f_1 ** 2 - 2 * self.f_1 + 1) - self.D_2[
+                    0, 0] * self.f_1 ** 2)) / self.gamma ** 2
+        Dr_d_f1[2, 1] = Dr_d_f1[1, 2]
+        Dr_d_f1[2, 2] = self.D_1[2, 2] - self.D_2[2, 2] - ((self.D_1[0, 2] - self.D_2[0, 2]) ** 2 * (
+                    self.D_1[0, 0] * (self.f_1 ** 2 - 2 * self.f_1 + 1) - self.D_2[
+                0, 0] * self.f_1 ** 2)) / self.gamma ** 2
+        Dr_d_f2 = np.zeros((3, 3))
+        Dr_d_f2[0, 0] = (self.D_2[0, 0] - self.D_1[0, 0]) * (self.D_1[0, 0] * self.D_2[0, 0]) / self.gamma ** 2
+        Dr_d_f2[0, 1] = (self.D_1[0, 0] * self.D_2[0, 0] * (self.D_2[0, 1] - self.D_1[0, 1])) / self.gamma ** 2
+        Dr_d_f2[1, 0] = Dr_d_f2[0, 1]
+        Dr_d_f2[0, 2] = (self.D_1[0, 0] * self.D_2[0, 0] * (self.D_2[0, 2] - self.D_1[0, 2])) / self.gamma ** 2
+        Dr_d_f2[2, 0] = Dr_d_f2[0, 2]
+        Dr_d_f2[1, 1] = self.D_2[1, 1] - self.D_1[1, 1] - ((self.D_1[0, 1] - self.D_2[0, 1]) ** 2 * (
+                    self.D_2[0, 0] * (-(self.f_2 ** 2) + 2 * self.f_2 + 1) + self.D_1[
+                0, 0] * self.f_2 ** 2)) / self.gamma ** 2
+        Dr_d_f2[1, 2] = self.D_2[1, 2] - self.D_1[1, 2] - (
+                    (self.D_1[0, 1] - self.D_2[0, 1]) * (self.D_1[0, 2] - self.D_2[0, 2]) * (
+                        self.D_2[0, 0] * (-(self.f_2 ** 2) + 2 * self.f_2 + 1) + self.D_1[
+                    0, 0] * self.f_2 ** 2)) / self.gamma ** 2
+        Dr_d_f2[2, 1] = Dr_d_f2[1, 2]
+        Dr_d_f2[2, 2] = self.D_2[2, 2] - self.D_1[2, 2] - ((self.D_1[0, 2] - self.D_2[0, 2]) ** 2 * (
+                    self.D_2[0, 0] * (-(self.f_2 ** 2) + 2 * self.f_2 + 1) + self.D_1[
+                0, 0] * self.f_2 ** 2)) / self.gamma ** 2
+
+        self.Dr_d_f1 = Dr_d_f1
+        self.Dr_d_f2 = Dr_d_f2
         self.D_d_theta = np.matmul(np.matmul(-self.rot_mat_prime(-self.theta), self.D_r), self.rot_mat(self.theta)) + np.matmul(np.matmul(self.rot_mat(-self.theta), self.D_r), self.rot_mat_prime(self.theta))
         self.Dr_d_D1 = Dr_d_D1
         self.Dr_d_D2 = Dr_d_D2
@@ -192,19 +228,17 @@ class Branch:
         Update weight for branch node. use RELu for input layer only.
         :return:
         """
-        if self.z <= 0:
-            self.z = 0
-        else:
-            gamma = 0.99
-            #self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj))**2
-            #learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
-            #self.learn_z = np.min([learn, 0.05])
-            self.learn_z = 0.01
-            self.z -= self.learn_z*(np.mean(self.dC_dZj))
-            if self.z <= 0:
-                self.z = 0
-        self.w = self.z
-        self.dC_dZj = []
+        gamma = 0.99
+        #self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dZj))**2
+        #learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
+        #self.learn_z = np.min([learn, 0.05])
+        self.learn_w = 0.005
+        if not self.inp:
+            self.learn_w = 0.005
+        self.w -= self.learn_w*(np.mean(self.dC_dW))
+        if self.w < 0:
+            self.w = 0
+        self.dC_dW = []
 
     def calc_delta(self, child_1):
         delta_new = np.zeros((3, 3))
@@ -238,16 +272,16 @@ class Network:
             samples = rng.uniform(size=(2, 1))
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                in_node = Branch(D_1, D_1, (samples[0][0]*np.pi - np.pi/2),True, samples[1][0]*0.6 + 0.2)
+                in_node = Branch(D_1, D_1, np.pi*(samples[0,0] - 1/2) ,True, samples[1][0]*0.6 + 0.2)
                 in_node.D_r = D_1
             else:
                 # Phase 2 input nodes
-                in_node = Branch(D_2, D_2, (samples[0][0]*np.pi - np.pi/2),True, samples[1][0]*0.6 + 0.2)
+                in_node = Branch(D_2, D_2, np.pi*(samples[0,0] - 1/2),True, samples[1][0]*0.6 + 0.2)
                 in_node.D_r = D_2
             self.input_layer.append(in_node)
 
         self.layers = []
-        self.zs = [np.max([node.z, 0]) for node in self.input_layer]
+        self.ws = [node.w for node in self.input_layer]
         for i in range(0, N-1):
             self.layers.append(self.fill_layer(i))
 
@@ -260,7 +294,7 @@ class Network:
         rng = np.random.default_rng()
         for j in range(int(len(prev_layer)/2)):
             samples = rng.uniform(size=(2, 1))
-            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1], (samples[0][0]*np.pi - np.pi/2), False, 0.5))
+            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1],np.pi*(samples[0,0] - 1/2), False, samples[1][0]*0.6 + 0.2))
         return new_layer
 
     def get_comp(self):
@@ -303,12 +337,16 @@ class Network:
                 if i == 0:
                     # output layer
                     delta_new = self.del_C
+                    dC_dW = 0
+                    node.dC_dW.append(dC_dW)
                 else:
                     parent_node = prev_layer[m]
                     if np.mod(k, 2) == 0:
                         delta_new = parent_node.calc_delta(True)
+                        Dr_df = parent_node.Dr_d_f1
                     else:
                         delta_new = parent_node.calc_delta(False)
+                        Dr_df = parent_node.Dr_d_f2
                         m += 1
                 node.delta = delta_new
                 alpha = np.zeros((3, 3))
@@ -316,31 +354,35 @@ class Network:
                     for l in range(3):
                         alpha[n, l] = np.sum(delta_new * node.D_d_Dr[:, :, n, l])
                 node.alpha = alpha
+                if i != 0:
+                    if (parent_node.ch_1.w + parent_node.ch_2.w) == 0:
+                        node.dC_dW.append(0)
+                    else:
+                        dC_dW = node.w * np.sum(parent_node.alpha * Dr_df)/(parent_node.ch_1.w + parent_node.ch_2.w)
+                        node.dC_dW.append(dC_dW)
                 dC_d_theta = np.sum(delta_new*node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
-                #dC_dZj = np.sum(alpha*node.D_r)
-                #node.dC_dZj.append(dC_dZj)
             prev_layer = layer
         for j, node in enumerate(self.input_layer):
-            if node.z <= 0:
-                node.dC_dZj = 0
+            if node.w <= 0:
+                node.dC_dW = 0
                 node.dC_dTheta.append(0)
             else:
                 parent_ind = int((j - np.mod(j, 2)) / 2)
                 parent_node = self.layers[0][parent_ind]
                 if np.mod(j, 2) == 0:
                     delta_new = parent_node.calc_delta(True)
+                    Dr_df = parent_node.Dr_d_f1
                 else:
                     delta_new = parent_node.calc_delta(False)
+                    Dr_df = parent_node.Dr_d_f2
                 alpha = np.zeros((3, 3))
                 node.theta_grad()
                 for n in range(3):
                     for l in range(3):
                         alpha[n, l] = np.sum(delta_new * node.D_d_Dr[:, :, n, l])
-
-                dC_dZj = np.sum(alpha*node.D_r)
-                node.dC_dZj.append(dC_dZj)
-
+                dC_dW = node.w * np.sum(parent_node.alpha * Dr_df) / (parent_node.ch_1.w + parent_node.ch_2.w)
+                node.dC_dW.append(dC_dW)
                 dC_d_theta = np.sum(delta_new * node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
 
@@ -348,11 +390,12 @@ class Network:
         for i, node in enumerate(self.input_layer):
             node.update_z()
             node.update_theta()
-        for layer in self.layers:
+
+        for j, layer in enumerate(self.layers):
             for node in layer:
-                #node.update_z()
+                node.update_z()
                 node.update_theta()
-        self.zs = [node.z for node in self.input_layer]
+        self.ws = [node.w for node in self.input_layer]
 
 
 def component_vec(matrix):
