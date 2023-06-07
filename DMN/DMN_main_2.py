@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import DMN
+import DMN_2
 import matplotlib.pyplot as plt
 import time
 
@@ -34,8 +35,13 @@ def write_dmn(dmn, ind):
             data.append(f"{str(node.theta)} ")
         data.append("\n")
     for node in dmn.input_layer:
-        data.append(f"{str(node.z)} ")
-    with open(f'data/DMN_{str(ind)}.txt', 'w') as file:
+        data.append(f"{str(node.w)} ")
+    data.append("\n")
+    for layer in dmn.layers:
+        for node in layer:
+            data.append(f"{str(node.w)} ")
+        data.append("\n")
+    with open(f'data/DMN_{ind}.txt', 'w') as file:
         file.writelines(data)
 
 
@@ -105,11 +111,11 @@ def create_dmn_from_save(dmn_file):
     """
     with open(f'data/{dmn_file}.txt', 'r') as file:
         in_data = file.readlines()
-    N = len(in_data)-1
+    N = int(len(in_data)/2)
     D1 = np.zeros((3, 3))
     D2 = np.zeros((3, 3))
     DC = np.zeros((3, 3))
-    nn = DMN.Network(N, D1, D2, DC)
+    nn = DMN_2.Network(N, D1, D2, DC)
     theta_in = in_data[0].split(" ")
     for i, node in enumerate(nn.input_layer):
         node.theta = float(theta_in[i])
@@ -117,10 +123,16 @@ def create_dmn_from_save(dmn_file):
         thetas = in_data[i+1].split(" ")
         for j, node in enumerate(layer):
             node.theta = float(thetas[j])
-    zs = in_data[-1].split(" ")
+        ind = i
+    zs = in_data[ind + 2].split(" ")
     for i, node in enumerate(nn.input_layer):
-        node.z = float(zs[i])
-        node.w = np.max([node.z, 0])
+        node.w = float(zs[i])
+    for j, layer in enumerate(nn.layers):
+        ws = in_data[ind+3+j].split(" ")
+        for k, node in enumerate(layer):
+            node.w = float(ws[k])
+
+
     return nn
 
 
@@ -138,21 +150,21 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
         D1 = np.zeros((3, 3))
         D2 = np.zeros((3, 3))
         DC = np.zeros((3, 3))
-        nn = DMN.Network(N, D1, D2, DC)
+        nn = DMN_2.Network(N, D1, D2, DC)
         print("new network")
     else:
         N = nn.N
-        nn.zs = [node.z for node in nn.input_layer]
+        nn.ws = [node.w for node in nn.input_layer]
         print("old network")
     cost = []
     theta_0 = np.zeros((int(epoch * N_s / M), 1))
-    zs = np.zeros((int(epoch*N_s/M), 2**(N-1)))
+    ws = np.zeros((int(epoch*N_s/M), 2))
     cs = np.zeros((int(epoch * N_s / M), 2 ** (N - 1)))
     thetas = np.zeros((int(epoch*N_s/M), 2**(N-1)))
     m = 0
     epoch_cost = np.zeros((epoch, 1))
     epoch_cost_0 = np.zeros((epoch, 1))
-    epoch_zs = np.zeros((epoch, 2**(N-1)))
+    epoch_ws = np.zeros((epoch, 2**(N-1)))
     epoch_thetas = np.zeros((epoch, 2**(N-1)))
     if inter_plot:
         plt.ion()
@@ -185,8 +197,8 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
                 k += 1
 
             nn.learn_step()
-            zs[m, :] = [node.z for node in nn.input_layer]
-            cs[m, :] = [node.learn_z for node in nn.input_layer]
+            ws[m, :] = [node.w for node in nn.layers[-2]]
+            cs[m, :] = [node.learn_w for node in nn.input_layer]
             theta_0[m] = nn.layers[-1][0].theta
             thetas[m, :] = [node.theta for node in nn.input_layer]
             cost.append(np.sum(nn.C)/(2*M))
@@ -197,19 +209,19 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
                 axs[2].clear()
                 axs[3].clear()
 
-                axs[0].plot(range(m), zs[0:m, :])
+                axs[0].plot(range(m), ws[0:m, :])
                 axs[2].plot(range(m), thetas[0:m, :])
                 axs[3].plot(range(m), cs[0:m, :])
             print(cost[-1])
             m += 1
 
         epoch_cost[i] = batch_cost/(N_s/M)
-        epoch_zs[i, :] = nn.zs
+        epoch_ws[i, :] = nn.ws
         epoch_thetas[i, :] = [node.theta for node in nn.input_layer]
         if inter_plot:
             axs[1].clear()
             axs[1].set_yscale("log")
-            axs[0].set_title(f"z, deactivated nodes: {nn.zs.count(0)}/{len(nn.zs)}")
+            axs[0].set_title(f"z, deactivated nodes: {nn.ws.count(0)}/{len(nn.ws)}")
             axs[0].set_xlabel("learning steps")
             axs[0].set_ylabel("activation")
             axs[1].set_title("Cost function")
@@ -239,11 +251,11 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     axs[2].set_ylabel("Rotation angle")
     axs[1].plot(range(len(cost)), cost)
     axs[2].plot(range(len(thetas)), thetas)
-    axs[0].plot(range(len(zs)), zs)
+    axs[0].plot(range(len(ws)), ws)
     plt.show()
     plt.savefig(f"train_sample_{ind}_ext.svg")
 
-    return nn, epoch_cost_0, epoch_zs, epoch_thetas
+    return nn, epoch_cost_0, epoch_ws, epoch_thetas
 
 
 def run_validation(nn, valid_set):
@@ -259,26 +271,24 @@ def run_validation(nn, valid_set):
         nn.update_phases(D1, D2, DC)
         nn.forward_pass()
         nn.calc_cost()
-    cost = np.sum(nn.C0)/(2*N_s)
+    cost = np.sum(nn.C)/(2*N_s)
     return cost
 
 
 data = read_dataset("Symdata2")
-new = True
+new = False
 
 if new:
     N = 8
     mini_batch = 25
-    ind = 54
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(2000, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    ind = 75
+    nn, epoc_cost, epoch_ws, epoch_thetas = run_train_sample(100, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
-    write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
+    write_data(epoc_cost, epoch_ws, epoch_thetas, ind)
 else:
-    mini_batch = 50
-    ind = 26
+    mini_batch = 25
+    ind = 76
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    #nn_old.update_learn_rate(0.01, 0.0002)
-    #nn_old.lam = 0
     nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(2000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
