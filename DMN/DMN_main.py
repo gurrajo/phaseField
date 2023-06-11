@@ -151,6 +151,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     thetas = np.zeros((int(epoch*N_s/M), 2**(N-1)))
     m = 0
     epoch_cost = np.zeros((epoch, 1))
+    epoch_error = np.zeros((epoch, 1))
     epoch_cost_0 = np.zeros((epoch, 1))
     epoch_zs = np.zeros((epoch, 2**(N-1)))
     epoch_thetas = np.zeros((epoch, 2**(N-1)))
@@ -174,13 +175,14 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
         print("Epoch " + str(i))
         batch_cost = 0
         batch_cost_0 = 0
+        batch_error = 0
         for l in range(int(N_s/M)):
             for j in range(M):
                 (D1, D2, DC) = extract_D_mat(data, k)
                 nn.update_phases(D1, D2, DC)
                 nn.forward_pass()
                 nn.calc_cost()
-                nn.backwards_prop()
+                nn.backwards_prop_2()
                 k += 1
 
             nn.learn_step()
@@ -191,8 +193,10 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
             cost.append(np.sum(nn.C)/(2*M))
             batch_cost += np.sum(nn.C)/(2*M)
             batch_cost_0 += np.sum(nn.C0) / (2 * M)
+            batch_error += np.sum(nn.error) / M
             nn.C = []
             nn.C0 = []
+            nn.error = []
             if inter_plot:
                 axs[0].clear()
                 axs[2].clear()
@@ -206,6 +210,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
 
         epoch_cost[i] = batch_cost/(N_s/M)
         epoch_cost_0[i] = batch_cost_0/(N_s/M)
+        epoch_error[i] = batch_error / (N_s / M)
         epoch_zs[i, :] = nn.zs
         epoch_thetas[i, :] = [node.theta for node in nn.input_layer]
         if inter_plot:
@@ -223,8 +228,8 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
             axs[3].set_title(fr"$z$ learn rate")
             axs[3].set_xlabel("Learning steps")
             axs[3].set_ylabel(fr"$\eta$")
-            axs[1].plot(range(i), epoch_cost[0:i])
-            axs[1].plot(range(i), epoch_cost_0[0:i])
+            #axs[1].plot(range(i), epoch_cost_0[0:i])
+            axs[1].plot(range(i), epoch_error[0:i])
             fig.canvas.draw()
             fig.canvas.flush_events()
     plt.savefig(f"train_sample_{ind}_run.svg")
@@ -256,30 +261,32 @@ def run_validation(nn, valid_set):
     """
     N_s = 200
     nn.C = []
+    cost_vec = []
     for i in range(N_s):
         (D1, D2, DC) = extract_D_mat(valid_set, i)
         nn.update_phases(D1, D2, DC)
         nn.forward_pass()
         nn.calc_cost()
-    cost = np.sum(nn.C0)/(2*N_s)
+        cost_vec.append(np.linalg.norm(DC-nn.get_comp(), 'fro')/np.linalg.norm(nn.get_comp(), 'fro'))
+    cost = np.mean(cost_vec)
     return cost
 
 
 data = read_dataset("Symdata2")
 new = False
-
 if new:
     N = 8
-    mini_batch = 25
-    ind = 30
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(800, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    mini_batch = 10
+    ind = 350
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(50, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
-    mini_batch = 25
-    ind = 30
+    mini_batch = 10
+    ind = 350
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(500, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn_old.lam = 0.1
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 
