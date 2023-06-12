@@ -9,8 +9,6 @@ def change_material(phase_1, phase_2, test_nr):
         data = file.readlines()
     next_line = False
     for i, line in enumerate(data):
-        if i == 15438:
-            print(line)
         if next_line == "Mat_1":
             data[i] = (f'MAT8           9{phase_1.E_1}50.0    0.35    40.0    1.0     1.0\n')
             print(1)
@@ -87,7 +85,7 @@ def read_grid_data(file_name):
     with open(f'nastran_input/{file_name}.bdf', 'r') as file:
         in_data = file.readlines()
     disp_flag = False
-    out_data = np.ndarray((7247, 3))
+    out_data = np.ndarray((16223, 3))
     in_data_iter = iter(in_data)
     i = 0
     for line in in_data_iter:
@@ -137,7 +135,7 @@ def linear_shear_displacement(file_name, grid_data, max_disp):
                 val = grid_data[ind, 1]
             else:
                 print("fail")
-            spcd = max_disp * val[0, 0] / 255
+            spcd = max_disp * val[0, 0] / 255000
             spcd_string = "%.5f" % spcd
             spcd_string = list(spcd_string)
             while len(spcd_string) > 7:
@@ -170,14 +168,14 @@ def linear_displacement(file_name, grid_data, direc, max_disp):
             y = grid_data[ind, 2]
             if direc == "x":
                 direc_val = 1
-                spcd = max_disp * x[0, 0] / 255
+                spcd = float(max_disp * x[0, 0] / 255000)
             elif direc == "y":
                 direc_val = 2
-                spcd = max_disp * y[0, 0] / 255
+                spcd = float(max_disp * y[0, 0] / 255000)
             else:
                 print("no load direction stated")
                 return
-            spcd_string = "%.5f" % spcd
+            spcd_string = "%.7f" % spcd
             spcd_string = list(spcd_string)
             while len(spcd_string) > 7:
                 spcd_string.pop(-1)
@@ -314,12 +312,15 @@ def quad_element_nodes(file_name):
     out_data = []
     in_data_iter = iter(in_data)
     for line in in_data_iter:
-        if re.findall("\$", line):
+        if re.findall("\$\$", line):
             data_flag = False
         if data_flag:
+            if re.findall("\$", line):
+                continue
             out_data.append(line)
         if re.findall("\$\$  CQUAD4 Elements", line):
             data_flag = True
+            next(in_data_iter)
             next(in_data_iter)
     e_node = np.ndarray((len(out_data), 5))
     for i, s in enumerate(out_data):
@@ -344,9 +345,12 @@ def tri_element_nodes(file_name):
         if re.findall("\$\$", line):
             data_flag = False
         if data_flag:
+            if re.findall("\$", line):
+                continue
             out_data.append(line)
         if re.findall("\$\$  CTRIA3 Data", line):
             data_flag = True
+            next(in_data_iter)
             next(in_data_iter)
     e_node = np.ndarray((len(out_data), 4))
     for i, s in enumerate(out_data):
