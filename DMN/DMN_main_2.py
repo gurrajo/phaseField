@@ -292,15 +292,15 @@ new = False
 if new:
     N = 8
     mini_batch = 10
-    ind = 150
-    nn, epoc_cost, epoch_ws = run_train_sample(200, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    ind = 160
+    nn, epoc_cost, epoch_ws = run_train_sample(100, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_ws, ind)
 else:
-    mini_batch = 10
-    ind = 150
+    mini_batch = 20
+    ind = 161
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs = run_train_sample(1000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs = run_train_sample(2000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, ind+1)
 

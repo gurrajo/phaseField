@@ -7,7 +7,7 @@ class Branch:
     The branch is the connection between two child nodes and one parent node
     """
     def __init__(self, child_1, child_2, theta, inp, z):
-        self.comp_correct = np.array([[1, 1 / 2, 1 / 2], [1 / 2, 1, 1 / 2], [1 / 2, 1 / 2, 1]])
+        self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
         self.alpha = np.zeros((3, 3))
         self.dC_dZj = []
         self.dC_dTheta = []
@@ -17,8 +17,8 @@ class Branch:
         self.c_z = 0.1  # RMSprop parameter
         self.learn_z = 0
         self.learn_theta = 0
-        self.eta_z = 0.08
-        self.eta_theta = 0.08  # learning rates
+        self.eta_z = 0.01
+        self.eta_theta = 0.01  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -129,9 +129,9 @@ class Branch:
             Dr_d_D[:, :, 2, 2] = [[0, 0, 0], [0, 0, 0], [0, 0, f_1]]
             return Dr_d_D
 
-
         dr_d_d1 = Dr_d_D_func(self.D_1, self.D_2, self.f_1, self.f_2)
         dr_d_d2 = Dr_d_D_func(self.D_2, self.D_1, self.f_2, self.f_1)
+
         def func_dr_df(f_1, f_2, D_1, D_2):
             Dr_d_f1 = np.zeros((3, 3))
             Dr_d_f1[0, 0] = (D_1[0, 0] - D_2[0, 0]) * (D_1[0, 0] * D_2[0, 0]) / self.gamma ** 2
@@ -174,7 +174,7 @@ class Branch:
         self.D_d_Dr = D_d_Dr
 
     def update_theta(self):
-        momentum = 0.4
+        momentum = 0
         dC_dTheta = self.eta_theta * np.mean(self.dC_dTheta) + self.dC_dtheta_prev*momentum
         self.dC_dtheta_prev = dC_dTheta
         self.theta -= dC_dTheta
@@ -193,7 +193,7 @@ class Branch:
         if self.z <= 0:
             self.z = 0
         else:
-            momentum = 0.4
+            momentum = 0
             dC_dZ = self.eta_z*(np.mean(self.dC_dZj) + dL_d_Z) + self.dC_dZ_prev*momentum
             self.dC_dZ_prev = dC_dZ
             self.z -= dC_dZ
@@ -208,9 +208,13 @@ class Branch:
             Dr_d_D = self.Dr_d_D1
         else:
             Dr_d_D = self.Dr_d_D2
-        for j in range(3):
-            for k in range(3):
-                delta_new[j, k] = np.sum(self.comp_correct*self.alpha*Dr_d_D[:, :, j, k])
+
+        delta_new[0, 0] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 0, 0])
+        delta_new[0, 1] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 0, 1])
+        delta_new[0, 2] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 0, 2])
+        delta_new[1, 1] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 1, 1])
+        delta_new[1, 2] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 1, 2])
+        delta_new[2, 2] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 2, 2])
 
         return delta_new
 
@@ -221,8 +225,8 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.comp_correct = np.array([[1, 1 / 2, 1 / 2], [1 / 2, 1, 1 / 2], [1 / 2, 1 / 2, 1]])
-        self.lam = 0.05
+        self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
+        self.lam = 0.2
         self.xi = 0.5
         self.C = []
         self.C0 = []
@@ -293,10 +297,10 @@ class Network:
 
     def calc_cost(self):
         D_bar = self.get_comp()
-        self.del_C = (D_bar - self.D_correct)/(np.linalg.norm(self.D_correct, 'fro'))**2  # cost gradient
-        self.C.append((((np.linalg.norm(self.D_correct - D_bar, 'fro'))**2)/((np.linalg.norm(self.D_correct, 'fro'))**2)) + (self.lam * ((np.sum(self.zs) - len(self.zs)*self.xi)**2)))
-        self.C0.append(((np.linalg.norm(self.D_correct - D_bar, 'fro'))**2)/((np.linalg.norm(self.D_correct, 'fro'))**2))
-        self.error.append((np.linalg.norm(self.D_correct - D_bar, 'fro')) / (np.linalg.norm(self.D_correct, 'fro')))
+        self.del_C = self.comp_correct*(D_bar - self.D_correct)/(np.linalg.norm(self.comp_correct*self.D_correct, 'fro'))**2  # cost gradient
+        self.C.append(((np.linalg.norm(self.comp_correct*(D_bar - self.D_correct), 'fro'))**2)/((np.linalg.norm(self.comp_correct*self.D_correct, 'fro'))**2))
+        self.error.append((np.linalg.norm(self.comp_correct*(D_bar - self.D_correct), 'fro'))/(np.linalg.norm(self.comp_correct*self.D_correct, 'fro')))
+        self.C0.append(((np.linalg.norm(self.comp_correct*(self.D_correct - D_bar), 'fro')) ** 2) / ((np.linalg.norm(self.comp_correct*self.D_correct, 'fro')) ** 2))
 
     def backwards_prop(self):
         for i, layer in enumerate(reversed(self.layers)):
@@ -357,11 +361,14 @@ class Network:
                         m += 1
                 node.delta = delta_new
                 alpha = np.zeros((3, 3))
-                for n in range(3):
-                    for l in range(3):
-                        alpha[n, l] = np.sum(self.comp_correct*delta_new * node.D_d_Dr[:, :, n, l])
+                alpha[0, 0] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 0])
+                alpha[0, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 1])
+                alpha[0, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 2])
+                alpha[1, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 1, 1])
+                alpha[1, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 1, 2])
+                alpha[2, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 2, 2])
                 node.alpha = alpha
-                dC_d_theta = np.sum(self.comp_correct*delta_new*node.D_d_theta)
+                dC_d_theta = np.sum(delta_new*node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
             prev_layer = layer
         for j, node in enumerate(self.input_layer):
@@ -377,10 +384,10 @@ class Network:
                     child_nodes = [parent_ind * 2, parent_ind * 2 + 1]
                     if prev_parent == child_nodes[0]:
                         df_dw = node.w/parent_node.w
-                        dC_dZj += np.sum(self.comp_correct*parent_node.alpha * parent_node.Dr_d_f1) * df_dw
+                        dC_dZj += np.sum(parent_node.alpha * parent_node.Dr_d_f1) * df_dw
                     elif prev_parent == child_nodes[1]:
                         df_dw = node.w/parent_node.w
-                        dC_dZj += np.sum(self.comp_correct*parent_node.alpha * parent_node.Dr_d_f2) * df_dw
+                        dC_dZj += np.sum(parent_node.alpha * parent_node.Dr_d_f2) * df_dw
                     else:
                         print("Fail")
                     prev_parent = parent_ind
@@ -393,7 +400,7 @@ class Network:
                     delta_new = parent_node.calc_delta(False)
 
                 node.theta_grad()
-                dC_d_theta = np.sum(self.comp_correct*delta_new * node.D_d_theta)
+                dC_d_theta = np.sum(delta_new * node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
 
     def learn_step(self):

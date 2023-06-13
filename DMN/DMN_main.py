@@ -273,20 +273,19 @@ def run_validation(nn, valid_set):
 
 
 data = read_dataset("Symdata2")
-new = False
+new = True
 if new:
-    N = 8
+    N = 7
     mini_batch = 10
-    ind = 350
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(50, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    ind = 370
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
     mini_batch = 10
-    ind = 350
+    ind = 365
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn_old.lam = 0.1
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(500, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 
