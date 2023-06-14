@@ -17,8 +17,8 @@ class Branch:
         self.c_z = 0.1  # RMSprop parameter
         self.learn_z = 0
         self.learn_theta = 0
-        self.eta_z = 0.01
-        self.eta_theta = 0.01  # learning rates
+        self.eta_z = 0.03
+        self.eta_theta = 0.03  # learning rates
         self.input = inp
         self.ch_1 = child_1
         self.ch_2 = child_2
@@ -190,15 +190,12 @@ class Branch:
         :return:
         """
         dL_d_Z = 2*lam*(np.sum(zs) - xi*len(zs))
-        if self.z <= 0:
-            self.z = 0
-        else:
-            momentum = 0
-            dC_dZ = self.eta_z*(np.mean(self.dC_dZj) + dL_d_Z) + self.dC_dZ_prev*momentum
-            self.dC_dZ_prev = dC_dZ
-            self.z -= dC_dZ
-        if self.z <= 0:
-            self.z = 0
+        momentum = 0
+        dC_dZ = self.eta_z*(np.mean(self.dC_dZj) + dL_d_Z) + self.dC_dZ_prev*momentum
+        self.dC_dZ_prev = dC_dZ
+        self.z -= dC_dZ
+        if self.z <= 0.0001:
+            self.z = 0.0001
         self.w = self.z
         self.dC_dZj = []
 
@@ -209,12 +206,12 @@ class Branch:
         else:
             Dr_d_D = self.Dr_d_D2
 
-        delta_new[0, 0] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 0, 0])
-        delta_new[0, 1] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 0, 1])
-        delta_new[0, 2] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 0, 2])
-        delta_new[1, 1] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 1, 1])
-        delta_new[1, 2] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 1, 2])
-        delta_new[2, 2] = np.sum(self.comp_correct * self.alpha * Dr_d_D[:, :, 2, 2])
+        delta_new[0, 0] = np.sum(self.alpha * Dr_d_D[:, :, 0, 0])
+        delta_new[0, 1] = np.sum(self.alpha * Dr_d_D[:, :, 0, 1])
+        delta_new[0, 2] = np.sum(self.alpha * Dr_d_D[:, :, 0, 2])
+        delta_new[1, 1] = np.sum(self.alpha * Dr_d_D[:, :, 1, 1])
+        delta_new[1, 2] = np.sum(self.alpha * Dr_d_D[:, :, 1, 2])
+        delta_new[2, 2] = np.sum(self.alpha * Dr_d_D[:, :, 2, 2])
 
         return delta_new
 
@@ -226,7 +223,7 @@ class Network:
     """
     def __init__(self, N, D_1, D_2, D_correct):
         self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
-        self.lam = 0.2
+        self.lam = 0
         self.xi = 0.5
         self.C = []
         self.C0 = []
@@ -281,13 +278,13 @@ class Network:
 
     def update_phases(self, D_1, D_2, DC):
         self.D_correct = DC
-        for j in range(2 ** (self.N - 1)):
+        for j, node in enumerate(self.input_layer):
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                self.input_layer[j].D_r = D_1
+                node.D_r = D_1
             else:
                 # Phase 2 input nodes
-                self.input_layer[j].D_r = D_2
+                node.D_r = D_2
 
     def update_learn_rate(self, new_eta_t, new_eta_z):
         for layer in self.layers:
@@ -318,11 +315,14 @@ class Network:
                         m += 1
                 node.delta = delta_new
                 alpha = np.zeros((3, 3))
-                for n in range(3):
-                    for l in range(3):
-                        alpha[n, l] = np.sum(self.comp_correct*delta_new * node.D_d_Dr[:, :, n, l])
+                alpha[0, 0] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 0])
+                alpha[0, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 1])
+                alpha[0, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 2])
+                alpha[1, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 1, 1])
+                alpha[1, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 1, 2])
+                alpha[2, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 2, 2])
                 node.alpha = alpha
-                dC_d_theta = np.sum(self.comp_correct*delta_new*node.D_d_theta)
+                dC_d_theta = np.sum(delta_new*node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
             prev_layer = layer
         for j, node in enumerate(self.input_layer):
@@ -335,14 +335,16 @@ class Network:
                 if np.mod(j, 2) == 0:
                     df_dw = node.w/parent_node.w
                     delta_new = parent_node.calc_delta(True)
-                    dC_dZj = np.sum(self.comp_correct*parent_node.alpha * parent_node.Dr_d_f1) * df_dw
+                    Dr_df = parent_node.Dr_d_f1
                 else:
                     df_dw = node.w/parent_node.w
                     delta_new = parent_node.calc_delta(False)
-                    dC_dZj = np.sum(self.comp_correct*parent_node.alpha * parent_node.Dr_d_f2) * df_dw
+                    Dr_df = parent_node.Dr_d_f2
+
+                dC_dZj = np.sum(parent_node.alpha * Dr_df) * df_dw
                 node.theta_grad()
                 node.dC_dZj.append(dC_dZj)
-                dC_d_theta = np.sum(self.comp_correct*delta_new * node.D_d_theta)
+                dC_d_theta = np.sum(delta_new * node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
 
     def backwards_prop_2(self):

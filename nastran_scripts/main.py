@@ -14,7 +14,7 @@ def write_dataset(arr):
     data = []
     for i, micro in enumerate(arr):
         data.append(f"{str(micro.test_nr)} {str(micro.phase_1)}{str(micro.phase_2)}{str(micro)}\n")
-    with open(f'data_set_3.txt', mode='w') as file:
+    with open(f'data/data_set_5.txt', mode='w') as file:
         file.writelines(data)
 
 def string_func(D):
@@ -30,11 +30,11 @@ def write_phases(D_1,D_2):
     data = []
     for i, D1 in enumerate(D_1):
         data.append(f"{string_func(D1)}{string_func(D_2[i])}\n")
-    with open(f'phase_data.txt', mode='w') as file:
+    with open(f'data/phase_data.txt', mode='w') as file:
         file.writelines(data)
 
 def extract_phases(phase_file):
-    with open(f'{phase_file}.txt', 'r') as file:
+    with open(f'data/{phase_file}.txt', 'r') as file:
         # read a list of lines into data
         data = file.readlines()
     out_data = []
@@ -45,7 +45,7 @@ def extract_phases(phase_file):
 
 
 start_time = time.time()
-orig_file_name = "morph_3_x"
+orig_file_name = "morph_5_x"
 # generate material space with latin hypercube
 # (D_1, D_2) = ph_gen.phaseinator()
 # write_phases(D_1,D_2)
@@ -84,11 +84,11 @@ for i in range(tests):
     micro_arr.append(Phase.Micro(phase_1, phase_2, test_nr, grid_data, e_area))
     micro_arr[i].elast_bounds()
     test_nr += 1
-#    time.sleep(15)
-#time.sleep(25)
+    time.sleep(10)
+time.sleep(25)
 
-#for i, micro in enumerate(micro_arr):
-#    micro.move_f06_files()
+for i, micro in enumerate(micro_arr):
+    micro.move_f06_files()
 
 for micro in micro_arr:
     micro.calc_stresses(e_node_2)
@@ -107,7 +107,7 @@ for micro in micro_arr:
 # # Micro object changes material data and generates new bdf files
 # # Micro object runs bdf files in Nastran
 # # Micro object interperates f06 file, gets (area, and element stresses)
-#write_dataset(micro_arr)
+write_dataset(micro_arr)
 stop_time = time.time()
 run_time = stop_time - start_time  # seconds
 print(run_time)

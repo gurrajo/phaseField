@@ -7,6 +7,7 @@ class Branch:
     The branch is the connection between two child nodes and one parent node
     """
     def __init__(self, child_1, child_2, theta, inp, w):
+
         self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
         self.inp = inp
         self.alpha = np.zeros((3, 3))
@@ -16,10 +17,10 @@ class Branch:
         self.c_z = 0.01# RMSprop parameter
         self.dC_dW_prev = 0
         self.dC_dtheta_prev = 0
-        self.learn_w = 0.02
-        self.learn_theta = 0.01
-        self.eta_z = 0.015
-        self.eta_theta = 0.015  # learning rates
+        self.learn_w = 0.01
+        self.learn_theta = 0.02
+        self.eta_z = 0.35
+        self.eta_theta = 0.35  # learning rates
         self.ch_1 = child_1
         self.ch_2 = child_2
         self.theta = theta
@@ -36,6 +37,7 @@ class Branch:
 
     def homogen(self):
         if (self.ch_1.w + self.ch_2.w) == 0:
+            # should never occur
             self.f_1 = 0
         else:
             self.f_1 = self.ch_1.w / (self.ch_1.w + self.ch_2.w)
@@ -49,10 +51,10 @@ class Branch:
         self.D_r[1, 0] = self.D_r[0, 1]
         self.D_r[0, 2] = 1/gamma*(self.f_1*self.D_1[0, 2]*self.D_2[0, 0] + self.f_2 * self.D_1[0, 0]*self.D_2[0, 2])
         self.D_r[2, 0] = self.D_r[0, 2]
-        self.D_r[1, 1] = self.f_1*self.D_1[1, 1] + self.f_2*self.D_2[1, 1] - self.f_1*self.f_2*(self.D_1[0,1] - self.D_2[0,1])**2/gamma
+        self.D_r[1, 1] = self.f_1*self.D_1[1, 1] + self.f_2*self.D_2[1, 1] - self.f_1*self.f_2*((self.D_1[0,1] - self.D_2[0,1])**2)/gamma
         self.D_r[1, 2] = self.f_1*self.D_1[1, 2] + self.f_2*self.D_2[1, 2] - self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])*(self.D_1[0,1] - self.D_2[0,1])/gamma
         self.D_r[2, 1] = self.D_r[1, 2]
-        self.D_r[2, 2] = self.f_1*self.D_1[2, 2] + self.f_2*self.D_2[2, 2] - self.f_1*self.f_2*(self.D_1[0,2] - self.D_2[0,2])**2/gamma
+        self.D_r[2, 2] = self.f_1*self.D_1[2, 2] + self.f_2*self.D_2[2, 2] - self.f_1*self.f_2*((self.D_1[0,2] - self.D_2[0,2])**2)/gamma
 
         self.gamma = gamma
 
@@ -172,14 +174,13 @@ class Branch:
         self.D_d_Dr = D_d_Dr
         self.D_d_Dr = D_d_Dr
 
-    def update_theta(self):
+    def update_theta(self, N):
         # gamma = 1
         # self.c_theta = self.c_theta * gamma + (1 - gamma) * ((np.mean(self.dC_dTheta)) ** 2)
         # learn = self.eta_theta / (np.sqrt(self.c_theta) + 1E-6)
         # self.learn_theta = np.min([learn, 0.4])
-        momentum = 0
-        dC_dtheta = self.eta_theta * np.mean(self.dC_dTheta) + momentum*self.dC_dtheta_prev
-        self.dC_dtheta_prev = dC_dtheta
+        eta = self.eta_theta / N
+        dC_dtheta = eta * np.mean(self.dC_dTheta)
         self.theta -= dC_dtheta
         if self.theta > np.pi/2:
             self.theta -= np.pi
@@ -187,21 +188,21 @@ class Branch:
             self.theta += np.pi
         self.dC_dTheta = []
 
-    def update_z(self):
+    def update_z(self, N):
         """
         Update weight for branch node
+        N : Layer index
         :return:
         """
         # gamma = 0.9
         # self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dW))**2
         # learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
         # self.learn_w = np.min([learn, 1.5])
-        momentum = 0
-        dC_dW = np.mean(self.dC_dW)*self.learn_w + momentum*self.dC_dW_prev
-        self.dC_dW_prev = dC_dW
+        eta = self.eta_z
+        dC_dW = np.mean(self.dC_dW)*eta
         self.w -= dC_dW
-        if self.w <= 0:
-            self.w = 0
+        if self.w <= 0.001:
+            self.w = 0.001
         self.dC_dW = []
 
     def calc_delta(self, child_1):
@@ -225,6 +226,9 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
+        self.bias_del = []
+        self.eta = 0.1
+        self.bias = 0# -0.0516
         self.C = []
         self.C0 = []
         self.error = []
@@ -240,11 +244,11 @@ class Network:
             samples = rng.uniform(size=(2, 1))
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                in_node = Branch(D_1, D_1, np.pi*(samples[0,0] - 1/2) ,True, samples[1][0]*1 + 0.5)
+                in_node = Branch(D_1, D_1, np.pi*(samples[0][0] - 1/2), True, 0.49 + samples[1][0]*0.02)
                 in_node.D_r = D_1
             else:
                 # Phase 2 input nodes
-                in_node = Branch(D_2, D_2, np.pi*(samples[0,0] - 1/2),True, samples[1][0]*1 + 0.5)
+                in_node = Branch(D_2, D_2, np.pi*(samples[0][0] - 1/2), True, 0.49 + samples[1][0]*0.02)
                 in_node.D_r = D_2
             self.input_layer.append(in_node)
 
@@ -262,11 +266,12 @@ class Network:
         rng = np.random.default_rng()
         for j in range(int(len(prev_layer)/2)):
             samples = rng.uniform(size=(2, 1))
-            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1],np.pi*(samples[0,0] - 1/2), False, samples[1][0]*1 + 0.5))
+            new_layer.append(Branch(prev_layer[j*2], prev_layer[j*2 + 1],np.pi*(samples[0][0] - 1/2), False, 0.49 + samples[1][0]*0.02))
         return new_layer
 
     def get_comp(self):
-        return self.layers[-1][0].D_bar
+        D_bar = self.layers[-1][0].D_bar
+        return (1 + self.bias)*D_bar
 
     def forward_pass(self):
         for node in self.input_layer:
@@ -279,13 +284,13 @@ class Network:
 
     def update_phases(self, D_1, D_2, DC):
         self.D_correct = DC
-        for j in range(2 ** (self.N - 1)):
+        for j, node in enumerate(self.input_layer):
             if np.mod(j, 2) == 0:
                 # Phase 1 input nodes
-                self.input_layer[j].D_r = D_1
+                node.D_r = D_1
             else:
                 # Phase 2 input nodes
-                self.input_layer[j].D_r = D_2
+                node.D_r = D_2
 
     def update_learn_rate(self, new_eta_t, new_eta_z):
         for layer in self.layers:
@@ -306,6 +311,7 @@ class Network:
                 if i == 0:
                     # output layer
                     delta_new = self.del_C
+                    self.bias_del.append(np.sum(self.del_C))
                     dC_dW = 0
                     node.dC_dW.append(dC_dW)
                 else:
@@ -330,7 +336,7 @@ class Network:
                     if (parent_node.ch_1.w + parent_node.ch_2.w) == 0:
                         node.dC_dW.append(0)
                     else:
-                        dC_dW = node.w * np.sum(parent_node.alpha * Dr_df)/(parent_node.ch_1.w + parent_node.ch_2.w)
+                        dC_dW = node.w * np.sum(parent_node.alpha*Dr_df)/(parent_node.ch_1.w + parent_node.ch_2.w)
                         node.dC_dW.append(dC_dW)
                 dC_d_theta = np.sum(delta_new*node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
@@ -349,7 +355,7 @@ class Network:
                     delta_new = parent_node.calc_delta(False)
                     Dr_df = parent_node.Dr_d_f2
                 node.theta_grad()
-                dC_dW = node.w * np.sum(parent_node.alpha * Dr_df) / (parent_node.ch_1.w + parent_node.ch_2.w)
+                dC_dW = node.w * np.sum(parent_node.alpha*Dr_df) / (parent_node.ch_1.w + parent_node.ch_2.w)
                 node.dC_dW.append(dC_dW)
                 dC_d_theta = np.sum(delta_new * node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
@@ -357,13 +363,17 @@ class Network:
 
     def learn_step(self):
         for i, node in enumerate(self.input_layer):
-            node.update_z()
-            node.update_theta()
+            if np.mod(i, 2) == 0:
+                node.update_z(1)
+            node.update_theta(1)
 
         for j, layer in enumerate(self.layers):
-            for node in layer:
-                node.update_z()
-                node.update_theta()
+            for i, node in enumerate(layer):
+                if np.mod(i, 2) == 0:
+                    node.update_z(1)
+                node.update_theta(1)
+        self.bias -= self.eta*np.mean(self.bias_del)
+        self.bias_del = []
         self.ws = [node.w for node in self.input_layer]
 
 

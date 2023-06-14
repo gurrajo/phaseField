@@ -3,6 +3,40 @@ import re
 import DMN_2
 import matplotlib.pyplot as plt
 import time
+import os
+
+
+def elast_bounds(D_1, D_2):
+    """
+    calculate lower Reuss value and upper Voigt value for the representative elasticity parameters
+    """
+    vol_frac = 0.5
+    D_voigt = np.zeros((3, 3))
+    D_voigt[0, 0] = 1 / (vol_frac / D_1[0, 0] + (1 - vol_frac) / D_2[0, 0])
+    D_voigt[0, 1] = 1 / (vol_frac / D_1[0, 1] + (1 - vol_frac) / D_2[0, 1])
+    D_voigt[1, 0] = D_voigt[0, 1]
+    D_voigt[1, 1] = 1 / (vol_frac / D_1[1, 1] + (1 - vol_frac) / D_2[1, 1])
+    D_voigt[2, 2] = 1 / (vol_frac / D_1[2, 2] + (1 - vol_frac) / D_2[2, 2])
+
+    C_voigt = np.zeros((1, 4))
+    C_voigt[0, 0] = 1 / D_voigt[0, 0]
+    C_voigt[0, 1] = 1 / D_voigt[1, 1]
+    C_voigt[0, 3] = 1 / (2 * D_voigt[2, 2])
+    C_voigt[0, 2] = -C_voigt[0, 0] * D_voigt[1, 0]
+
+    D_reuss = np.zeros((3, 3))
+    D_reuss[0, 0] = vol_frac * D_1[0, 0] + (1 - vol_frac) * D_2[0, 0]
+    D_reuss[0, 1] = vol_frac * D_1[0, 1] + (1 - vol_frac) * D_2[0, 1]
+    D_reuss[1, 0] = D_reuss[0, 1]
+    D_reuss[1, 1] = vol_frac * D_1[1, 1] + (1 - vol_frac) * D_2[1, 1]
+    D_reuss[2, 2] = vol_frac * D_1[2, 2] + (1 - vol_frac) * D_2[2, 2]
+
+    C_reuss = np.zeros((1, 4))
+    C_reuss[0, 0] = 1 / D_reuss[0, 0]
+    C_reuss[0, 1] = 1 / D_reuss[1, 1]
+    C_reuss[0, 3] = 1 / (2 * D_reuss[2, 2])
+    C_reuss[0, 2] = -C_reuss[0, 0] * D_reuss[1, 0]
+    return C_reuss, C_voigt, D_reuss, D_voigt
 
 
 def file_reader(filename):
@@ -40,6 +74,7 @@ def write_dmn(dmn, ind):
         for node in layer:
             data.append(f"{str(node.w)} ")
         data.append("\n")
+    data.append(f"{str(dmn.bias)}\n")
     with open(f'data/DMN_{ind}.txt', 'w') as file:
         file.writelines(data)
 
@@ -130,12 +165,10 @@ def create_dmn_from_save(dmn_file):
         ws = in_data[ind+3+j].split(" ")
         for k, node in enumerate(layer):
             node.w = float(ws[k])
-
-
     return nn
 
 
-def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_lam=True):
+def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N=False, update_lam=True):
     """
     Train a DMN network for a set of epochs
     :param epoch: amount of epochs, one training session over dataset
@@ -144,7 +177,6 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     :param inter_plot: interactive plotting on or off.
     :return: Trained network object. Epoch averaged cost. z activations for each training step.
     """
-    N_s = 200
     if not nn:
         D1 = np.zeros((3, 3))
         D2 = np.zeros((3, 3))
@@ -172,7 +204,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     if inter_plot:
         plt.ion()
         fig, axs = plt.subplots(nn.N, 2, constrained_layout=True)
-        fig.suptitle(fr"N_s = {N_s}")
+        fig.suptitle(fr"dataset: {data_file}")
         fig.set_size_inches(16, 11, forward=True)
         axs[nn.N - 1, 0].set_yscale("log")
         axs[nn.N-1, 1].set_yscale("log")
@@ -267,44 +299,112 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
     return nn, epoch_cost, epoch_ws
 
 
+def showcase_temp_variation(dmn):
+    T = np.linspace(20, 150, 100)
+    E_1 = 6.2225*10**4 - 75*(T + 273.15)
+    nu_1 = 0.36
+    G_1 = E_1/(2*(1+nu_1))
+    E_2 = 3*10**4
+    nu_2 = 0.35
+    G_2 = E_2 / (2 * (1 + nu_2))
+    #  isotropic assumption
+    E_out = np.zeros((100, 1))
+    E_reuss = np.zeros((100, 1))
+    E_voigt = np.zeros((100, 1))
+    for i, t in enumerate(T):
+        D_1 = np.array([[1/E_1[i], -nu_1/E_1[i], 0], [-nu_1/E_1[i], 1/E_1[i], 0], [0, 0, 1/G_1[i]]])
+        D_2 = np.array([[1/E_2, -nu_2/E_2, 0], [-nu_2/E_2, 1/E_2, 0], [0, 0, 1/G_2]])
+        C_reuss, C_voigt, D_reuss, D_voigt = elast_bounds(D_1, D_2)
+        dmn.update_phases(D_1, D_2, np.zeros((3, 3)))
+        dmn.forward_pass()
+        D_out = dmn.get_comp()
+        E_out[i] = 1/D_out[0, 0]
+        E_voigt[i] = C_voigt[0, 0]
+        E_reuss[i] = C_reuss[0, 0]
+    fig = plt.figure()
+    plt.plot(T, E_1)
+    plt.plot(T, E_2*np.ones((100, 1)))
+    plt.plot(T, E_out)
+    plt.plot(T, E_voigt)
+    plt.plot(T, E_reuss)
+    plt.title("Temperature varying phase 1")
+    plt.xlabel(r"Temperature $c^0$")
+    plt.ylabel("E [MPa]")
+    plt.legend(["Phase 1", "Phase 2", "Homogenized material", "Voigt", "Reuss"])
+    plt.savefig("temp_varying.svg")
+    return E_out
+
+
+def validate_multiple(folder, data_set):
+    error = np.zeros((31, 1))
+    for i in range(31):
+        dmn = create_dmn_from_save(f"{folder}/{i}")
+        error[i], error_v, error_r = run_validation(dmn, data_set)
+    fig = plt.figure()
+    plt.plot(range(31), error)
+    plt.title("Error during training")
+    plt.xlabel(r"100 Epochs")
+    plt.ylabel("Error")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.savefig("validation_error_morph_1.svg")
+
+
 def run_validation(nn, valid_set):
     """
     :param nn: the DMN
     :param valid_set: data_set for validation.
     :return: validation cost. (Without cost function addition)
     """
-    N_s = 200
+    N_s = len(valid_set)
     nn.C = []
-    cost_vec = []
+    nn.error = []
+    voigt_error = []
+    reuss_error = []
+    comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
     for i in range(N_s):
         (D1, D2, DC) = extract_D_mat(valid_set, i)
+        C_reuss, C_voigt, D_reuss, D_voigt = elast_bounds(D1, D2)
+
+        reuss_error.append((np.linalg.norm(comp_correct * (D_reuss - DC), 'fro')) / (np.linalg.norm(comp_correct * DC, 'fro')))
+        voigt_error.append((np.linalg.norm(comp_correct * (D_voigt - DC), 'fro')) / (np.linalg.norm(comp_correct * DC, 'fro')))
         nn.update_phases(D1, D2, DC)
         nn.forward_pass()
         nn.calc_cost()
-        cost_vec.append(np.linalg.norm(DC-nn.get_comp(), 'fro')/np.linalg.norm(nn.get_comp(), 'fro'))
-    cost = np.sum(cost_vec)/N_s
-    return cost
+    error = np.sum(nn.error)/N_s
+    error_v = np.sum(voigt_error)/N_s
+    error_r = np.sum(reuss_error)/N_s
+    return error, error_v, error_r
 
-
-data = read_dataset("Symdata2")
+data_file = "data_comb"
+#data_file = "Symdata2"
+#data_file = "data_comb_5"
+data = read_dataset(data_file)
 new = False
+#nn_old = create_dmn_from_save("DMN_222_14.0")
+#valid_data = read_dataset("validation")
+#valid_cost, error_v, error_r = run_validation(nn_old, valid_data)
+#showcase_temp_variation(nn_old)
+#print(1)
 
 if new:
+    N_s = 125
     N = 8
-    mini_batch = 10
-    ind = 160
-    nn, epoc_cost, epoch_ws = run_train_sample(100, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    mini_batch = 25
+    ind = 900
+    nn, epoc_cost, epoch_ws = run_train_sample(300, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_ws, ind)
 else:
-    mini_batch = 20
-    ind = 161
+    N_s = 150
+    mini_batch = 30
+    ind = 300
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs = run_train_sample(2000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs = run_train_sample(1000, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, ind+1)
 
 valid_data = read_dataset("validation")
-valid_cost = run_validation(nn, valid_data)
+valid_cost, error_v, error_r = run_validation(nn, valid_data)
 print("validation cost: " + str(valid_cost))
 print(1)

@@ -182,7 +182,7 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
                 nn.update_phases(D1, D2, DC)
                 nn.forward_pass()
                 nn.calc_cost()
-                nn.backwards_prop_2()
+                nn.backwards_prop()
                 k += 1
 
             nn.learn_step()
@@ -213,6 +213,9 @@ def run_train_sample(epoch, M, ind, nn=False, inter_plot=True, N=False, update_l
         epoch_error[i] = batch_error / (N_s / M)
         epoch_zs[i, :] = nn.zs
         epoch_thetas[i, :] = [node.theta for node in nn.input_layer]
+        if np.mod(i,100) == 0:
+            write_dmn(nn, f"{ind}_{i/100}")
+
         if inter_plot:
             axs[1].clear()
             axs[1].set_yscale("log")
@@ -277,15 +280,15 @@ new = True
 if new:
     N = 7
     mini_batch = 10
-    ind = 370
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
+    ind = 380
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(3500, mini_batch, ind, N=N, inter_plot=True, update_lam=False)
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind)
 else:
     mini_batch = 10
-    ind = 365
+    ind = 376
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(500, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs, epoch_thetas = run_train_sample(1000, mini_batch, ind+1, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, epoch_thetas, ind+1)
 
