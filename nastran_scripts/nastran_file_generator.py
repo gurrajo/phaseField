@@ -85,7 +85,7 @@ def read_grid_data(file_name):
     with open(f'nastran_input/{file_name}.bdf', 'r') as file:
         in_data = file.readlines()
     disp_flag = False
-    out_data = np.ndarray((16223, 3))
+    out_data = np.ndarray((16508, 3))
     in_data_iter = iter(in_data)
     i = 0
     for line in in_data_iter:
