@@ -363,13 +363,13 @@ class Network:
 
     def learn_step(self):
         for i, node in enumerate(self.input_layer):
-            if np.mod(i, 2) == 0:
+            if np.mod(i, 2) == 1:
                 node.update_z(1)
             node.update_theta(1)
 
         for j, layer in enumerate(self.layers):
             for i, node in enumerate(layer):
-                if np.mod(i, 2) == 0:
+                if np.mod(i, 2) == 1:
                     node.update_z(1)
                 node.update_theta(1)
         self.bias -= self.eta*np.mean(self.bias_del)

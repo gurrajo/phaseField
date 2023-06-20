@@ -376,31 +376,30 @@ def run_validation(nn, valid_set):
     error_r = np.sum(reuss_error)/N_s
     return error, error_v, error_r
 
-data_file = "data_comb"
+#data_file = "data_comb"
 #data_file = "Symdata2"
-#data_file = "data_comb_5"
+data_file = "data_comb_5"
 data = read_dataset(data_file)
 new = False
-#nn_old = create_dmn_from_save("DMN_222_14.0")
-#valid_data = read_dataset("validation")
-#valid_cost, error_v, error_r = run_validation(nn_old, valid_data)
+nn_old = create_dmn_from_save("DMN_222_14.0")
+valid_cost, error_v, error_r = run_validation(nn_old, data)
 #showcase_temp_variation(nn_old)
-#print(1)
+print(1)
 
 if new:
     N_s = 125
     N = 8
     mini_batch = 25
-    ind = 900
+    ind = 950
     nn, epoc_cost, epoch_ws = run_train_sample(300, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_ws, ind)
 else:
-    N_s = 150
-    mini_batch = 30
-    ind = 300
+    N_s = 125
+    mini_batch = 25
+    ind = 900
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs = run_train_sample(1000, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs = run_train_sample(1500, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, ind+1)
 
