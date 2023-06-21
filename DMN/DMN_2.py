@@ -7,20 +7,22 @@ class Branch:
     The branch is the connection between two child nodes and one parent node
     """
     def __init__(self, child_1, child_2, theta, inp, w):
-
+        self.bias = 0
+        self.bias_eta = 0.01
+        self.bias_del = []
         self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
         self.inp = inp
         self.alpha = np.zeros((3, 3))
         self.dC_dW = []
         self.dC_dTheta = []
         self.c_theta = 0.01  # RMSprop parameter
-        self.c_z = 0.01# RMSprop parameter
+        self.c_z = 0.01  # RMSprop parameter
         self.dC_dW_prev = 0
         self.dC_dtheta_prev = 0
         self.learn_w = 0.01
         self.learn_theta = 0.02
-        self.eta_z = 0.35
-        self.eta_theta = 0.35  # learning rates
+        self.eta_z = 0.18
+        self.eta_theta = 0.2  # learning rates
         self.ch_1 = child_1
         self.ch_2 = child_2
         self.theta = theta
@@ -41,8 +43,8 @@ class Branch:
             self.f_1 = 0
         else:
             self.f_1 = self.ch_1.w / (self.ch_1.w + self.ch_2.w)
-        self.D_1 = self.ch_1.D_bar
-        self.D_2 = self.ch_2.D_bar
+        self.D_1 = self.ch_1.D_bar*(1 + self.ch_1.bias)
+        self.D_2 = self.ch_2.D_bar*(1 + self.ch_2.bias)
 
         self.f_2 = 1 - self.f_1
         gamma = self.f_1*self.D_2[0, 0] + self.f_2*self.D_1[0, 0]
@@ -188,6 +190,12 @@ class Branch:
             self.theta += np.pi
         self.dC_dTheta = []
 
+    def bias_update(self):
+        self.bias -= self.bias_eta*np.mean(self.bias_del)
+        if self.bias <= -0.99:
+            self.bias = -0.99
+        self.bias_del = []
+
     def update_z(self, N):
         """
         Update weight for branch node
@@ -226,9 +234,6 @@ class Network:
     Contains N layers
     """
     def __init__(self, N, D_1, D_2, D_correct):
-        self.bias_del = []
-        self.eta = 0.1
-        self.bias = 0# -0.0516
         self.C = []
         self.C0 = []
         self.error = []
@@ -271,7 +276,7 @@ class Network:
 
     def get_comp(self):
         D_bar = self.layers[-1][0].D_bar
-        return (1 + self.bias)*D_bar
+        return (1 + self.layers[-1][0].bias)*D_bar
 
     def forward_pass(self):
         for node in self.input_layer:
@@ -311,7 +316,7 @@ class Network:
                 if i == 0:
                     # output layer
                     delta_new = self.del_C
-                    self.bias_del.append(np.sum(self.del_C))
+                    node.bias_del.append(np.sum(self.del_C))
                     dC_dW = 0
                     node.dC_dW.append(dC_dW)
                 else:
@@ -324,6 +329,7 @@ class Network:
                         Dr_df = parent_node.Dr_d_f2
                         m += 1
                 node.delta = delta_new
+                node.bias_del.append(np.sum(delta_new))
                 alpha = np.zeros((3, 3))
                 alpha[0, 0] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 0])
                 alpha[0, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 1])
@@ -354,6 +360,7 @@ class Network:
                 else:
                     delta_new = parent_node.calc_delta(False)
                     Dr_df = parent_node.Dr_d_f2
+                node.bias_del.append(np.sum(delta_new))
                 node.theta_grad()
                 dC_dW = node.w * np.sum(parent_node.alpha*Dr_df) / (parent_node.ch_1.w + parent_node.ch_2.w)
                 node.dC_dW.append(dC_dW)
@@ -363,17 +370,17 @@ class Network:
 
     def learn_step(self):
         for i, node in enumerate(self.input_layer):
-            if np.mod(i, 2) == 1:
-                node.update_z(1)
+            #if np.mod(i, 2) == 1:
+            node.update_z(1)
             node.update_theta(1)
+            node.bias_update()
 
         for j, layer in enumerate(self.layers):
             for i, node in enumerate(layer):
-                if np.mod(i, 2) == 1:
-                    node.update_z(1)
+                #if np.mod(i, 2) == 1:
+                node.update_z(1)
                 node.update_theta(1)
-        self.bias -= self.eta*np.mean(self.bias_del)
-        self.bias_del = []
+                node.bias_update()
         self.ws = [node.w for node in self.input_layer]
 
 
