@@ -400,8 +400,8 @@ def run_validation(nn, valid_set):
     return error, error_v, error_r
 
 #data_file = "data_comb"
-#data_file = "Symdata2"
-data_file = "data_comb_5"
+data_file = "Symdata2"
+#data_file = "data_comb_5"
 data = read_dataset(data_file)
 new = False
 #nn_old = create_dmn_from_save("DMN_222_14.0")
