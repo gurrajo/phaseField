@@ -74,7 +74,13 @@ def write_dmn(dmn, ind):
         for node in layer:
             data.append(f"{str(node.w)} ")
         data.append("\n")
-    data.append(f"{str(dmn.bias)}\n")
+    for node in dmn.input_layer:
+        data.append(f"{str(node.bias)} ")
+    data.append("\n")
+    for layer in dmn.layers:
+        for node in layer:
+            data.append(f"{str(node.bias)} ")
+        data.append("\n")
     with open(f'data/DMN_{ind}.txt', 'w') as file:
         file.writelines(data)
 
@@ -145,7 +151,7 @@ def create_dmn_from_save(dmn_file):
     """
     with open(f'data/{dmn_file}.txt', 'r') as file:
         in_data = file.readlines()
-    N = int(len(in_data)/2)
+    N = int(len(in_data)/3)
     D1 = np.zeros((3, 3))
     D2 = np.zeros((3, 3))
     DC = np.zeros((3, 3))
@@ -165,6 +171,13 @@ def create_dmn_from_save(dmn_file):
         ws = in_data[ind+3+j].split(" ")
         for k, node in enumerate(layer):
             node.w = float(ws[k])
+    bias = in_data[ind + 4 + j].split(" ")
+    for i, node in enumerate(nn.input_layer):
+        node.bias = float(bias[i])
+    for m, layer in enumerate(nn.layers):
+        bias = in_data[ind + 5 + j + m].split(" ")
+        for k, node in enumerate(layer):
+            node.bias = float(bias[k])
     return nn
 
 
@@ -191,11 +204,14 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
     error = []
     w_list = []
     th_list = []
+    bias_list = []
     th_list.append(np.zeros((int(epoch * N_s / M), 2 ** (N - 1))))
     w_list.append(np.zeros((int(epoch*N_s/M), 2 ** (N - 1))))
+    bias_list.append(np.zeros((int(epoch*N_s/M), 2 ** (N - 1))))
     for i, layer in enumerate(nn.layers):
         w_list.append(np.zeros((int(epoch*N_s/M), 2 ** (N - 2 - i))))
         th_list.append(np.zeros((int(epoch*N_s/M), 2 ** (N - 2 - i))))
+        bias_list.append(np.zeros((int(epoch*N_s/M), 2 ** (N - 2 - i))))
 
     m = 0
     epoch_cost = np.zeros((epoch, 1))
@@ -203,7 +219,7 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
     epoch_ws = np.zeros((epoch, 2**(N-1)))
     if inter_plot:
         plt.ion()
-        fig, axs = plt.subplots(nn.N, 2, constrained_layout=True)
+        fig, axs = plt.subplots(nn.N, 3, constrained_layout=True)
         fig.suptitle(fr"dataset: {data_file}")
         fig.set_size_inches(16, 11, forward=True)
         axs[nn.N - 1, 0].set_yscale("log")
@@ -233,11 +249,13 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
             nn.learn_step()
 
             # --Store values for plotting--
+            bias_list[0][m,:] = [node.bias for node in nn.input_layer]
             w_list[0][m, :] = [node.w for node in nn.input_layer]
             th_list[0][m, :] = [node.theta for node in nn.input_layer]
             for p, layer in enumerate(nn.layers):
                 w_list[p + 1][m, :] = [node.w for node in layer]
                 th_list[p + 1][m, :] = [node.theta for node in layer]
+                bias_list[p + 1][m, :] = [node.bias for node in layer]
             cost.append(np.sum(nn.C)/(2*M))
             batch_cost += np.sum(nn.C)/(2*M)
             batch_error += np.sum(nn.error) /M
@@ -247,13 +265,18 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
             if inter_plot:
                 axs[0, 0].clear()
                 axs[0, 1].clear()
+                axs[0, 2].clear()
                 axs[0, 0].plot(range(m), w_list[0][0:m, :])
                 axs[0, 1].plot(range(m), th_list[0][0:m, :])
+                axs[0, 2].plot(range(m), bias_list[0][0:m, :])
                 for l in range(nn.N - 2):
                     axs[l + 1, 0].clear()
                     axs[l + 1, 1].clear()
+                    axs[l + 1, 2].clear()
                     axs[l + 1, 0].plot(range(m), w_list[l+1][0:m, :])
                     axs[l + 1, 1].plot(range(m), th_list[l + 1][0:m, :])
+                    axs[l + 1, 2].plot(range(m), bias_list[l + 1][0:m, :])
+                axs[nn.N - 1, 2].plot(range(m), bias_list[nn.N - 1][0:m, :])
             m += 1
 
         epoch_error[i] = M*batch_error/N_s
@@ -377,29 +400,29 @@ def run_validation(nn, valid_set):
     return error, error_v, error_r
 
 #data_file = "data_comb"
-#data_file = "Symdata2"
-data_file = "data_comb_5"
+data_file = "Symdata2"
+#data_file = "data_comb_5"
 data = read_dataset(data_file)
 new = False
-nn_old = create_dmn_from_save("DMN_222_14.0")
-valid_cost, error_v, error_r = run_validation(nn_old, data)
+# nn_old = create_dmn_from_save("DMN_1000")
+# valid_cost, error_v, error_r = run_validation(nn_old, data)
 #showcase_temp_variation(nn_old)
 print(1)
 
 if new:
-    N_s = 125
-    N = 8
-    mini_batch = 25
-    ind = 950
-    nn, epoc_cost, epoch_ws = run_train_sample(300, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
+    N_s = 200
+    N = 6
+    mini_batch = 20
+    ind = 1005
+    nn, epoc_cost, epoch_ws = run_train_sample(5, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_ws, ind)
 else:
-    N_s = 125
+    N_s = 200
     mini_batch = 25
-    ind = 900
+    ind = 1005
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs = run_train_sample(1500, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs = run_train_sample(5, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, ind+1)
 
