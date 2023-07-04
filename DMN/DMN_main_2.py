@@ -6,6 +6,34 @@ import time
 import os
 
 
+def run_scatter_plot():
+    data = read_dataset("data_set_5")
+    in_vec_1 = 1/data[:, 1]
+    in_vec_2 = 1/data[:, 10]
+    out_vec = 1/data[:, 19]
+    fig = plt.figure(figsize=(10, 7))
+    ax = plt.axes(projection="3d")
+    # Creating color map
+    my_cmap = plt.get_cmap('hsv')
+    # Creating plot
+    sctt = ax.scatter3D(in_vec_1, in_vec_2, out_vec, alpha=0.8, c=(out_vec), cmap=my_cmap)
+    fig.colorbar(sctt, ax=ax)
+    ax.set_xlabel('Phase 1 E_1', fontweight='bold')
+    ax.set_ylabel('Phase 2 E_1', fontweight='bold')
+    ax.set_zlabel('Output E_1', fontweight='bold')
+    plt.title("Morphology 5 E_1")
+    plt.savefig("scatter_5.svg")
+    plt.show()
+
+
+def showcase_dataset_diff():
+    N_s = 100
+    for i in range(5):
+        data = read_dataset(f"data_set_{i}")
+        for j in range(N_s):
+            D1, D2, DC = extract_D_mat(data, j)
+
+
 def elast_bounds(D_1, D_2):
     """
     calculate lower Reuss value and upper Voigt value for the representative elasticity parameters
@@ -221,7 +249,7 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
         plt.ion()
         fig, axs = plt.subplots(nn.N, 3, constrained_layout=True)
         fig.suptitle(fr"dataset: {data_file}")
-        fig.set_size_inches(16, 11, forward=True)
+        fig.set_size_inches(14, 9, forward=True)
         axs[nn.N - 1, 0].set_yscale("log")
         axs[nn.N-1, 1].set_yscale("log")
     start_time = time.time()
@@ -400,29 +428,32 @@ def run_validation(nn, valid_set):
     return error, error_v, error_r
 
 #data_file = "data_comb"
-data_file = "Symdata2"
+data_file = "data_set_5"
+#data_file = "Symdata2"
 #data_file = "data_comb_5"
+#data_file = "comb_3_v2"
+#data_file = "comb_5n2"
 data = read_dataset(data_file)
-new = False
-#nn_old = create_dmn_from_save("DMN_222_14.0")
+#run_scatter_plot()
+new = True
+#nn_old = create_dmn_from_save("DMN_1406")
 #valid_cost, error_v, error_r = run_validation(nn_old, data)
 #showcase_temp_variation(nn_old)
-print(1)
 
 if new:
-    N_s = 150
+    N_s = 100
     N = 8
-    mini_batch = 30
-    ind = 1050
-    nn, epoc_cost, epoch_ws = run_train_sample(500, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
+    mini_batch = 20
+    ind = 1550
+    nn, epoc_cost, epoch_ws = run_train_sample(200, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_ws, ind)
 else:
-    N_s = 200
+    N_s = 100
     mini_batch = 20
-    ind = 1404
+    ind = 1301
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs = run_train_sample(1000, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs = run_train_sample(800, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, ind+1)
 
