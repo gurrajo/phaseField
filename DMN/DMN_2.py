@@ -8,7 +8,7 @@ class Branch:
     """
     def __init__(self, child_1, child_2, theta, inp, w):
         self.bias = 0
-        self.bias_eta = 0.01
+        self.bias_eta = 0.0001
         self.bias_del = []
         self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
         self.inp = inp
@@ -21,8 +21,8 @@ class Branch:
         self.dC_dtheta_prev = 0
         self.learn_w = 0.01
         self.learn_theta = 0.02
-        self.eta_z = 0.18
-        self.eta_theta = 0.2  # learning rates
+        self.eta_z = 0.15
+        self.eta_theta = 0.25  # learning rates
         self.ch_1 = child_1
         self.ch_2 = child_2
         self.theta = theta
@@ -370,14 +370,14 @@ class Network:
 
     def learn_step(self):
         for i, node in enumerate(self.input_layer):
-            #if np.mod(i, 2) == 1:
+            #if np.mod(i, 2) == 0:
             node.update_z(1)
             node.update_theta(1)
             node.bias_update()
 
         for j, layer in enumerate(self.layers):
             for i, node in enumerate(layer):
-                #if np.mod(i, 2) == 1:
+                #if np.mod(i, 2) == 0:
                 node.update_z(1)
                 node.update_theta(1)
                 node.bias_update()
