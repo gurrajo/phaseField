@@ -304,6 +304,7 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
                     axs[l + 1, 0].plot(range(m), w_list[l+1][0:m, :])
                     axs[l + 1, 1].plot(range(m), th_list[l + 1][0:m, :])
                     axs[l + 1, 2].plot(range(m), bias_list[l + 1][0:m, :])
+                axs[nn.N - 1, 2].clear()
                 axs[nn.N - 1, 2].plot(range(m), bias_list[nn.N - 1][0:m, :])
             m += 1
 
@@ -320,7 +321,13 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
             axs[0,1].set_title(f"thetas")
             axs[0,1].set_xlabel("learning steps")
             axs[0,1].set_ylabel("rot angles")
+
+            axs[0, 2].set_title(f"Bias")
+            axs[0, 2].set_xlabel("learning steps")
             for j in range(nn.N - 2):
+                axs[j + 1, 2].set_title(f"Bias")
+                axs[j + 1, 2].set_xlabel("learning steps")
+
                 axs[j+1,1].set_title(f"thetas")
                 axs[j+1, 1].set_xlabel("learning steps")
                 axs[j+1, 1].set_ylabel("rot angles")
@@ -339,6 +346,8 @@ def run_train_sample(epoch, M, ind, N_s, data_file, nn=False, inter_plot=True, N
             axs[nn.N-1,0].plot(range(i), epoch_error[0:i])
 
             axs[nn.N-1,1].clear()
+            axs[nn.N - 1, 2].set_title("Bias")
+            axs[nn.N - 1, 2].set_xlabel("learn steps")
             axs[nn.N-1,1].set_yscale("log")
             axs[nn.N-1,1].set_title("Cost")
             axs[nn.N-1,1].set_xlabel("Epochs")
@@ -428,32 +437,32 @@ def run_validation(nn, valid_set):
     return error, error_v, error_r
 
 #data_file = "data_comb"
-data_file = "data_set_5"
+#data_file = "data_set_3"
 #data_file = "Symdata2"
-#data_file = "data_comb_5"
+data_file = "data_set_1"
 #data_file = "comb_3_v2"
-#data_file = "comb_5n2"
+#data_file = "comb_2n5"
 data = read_dataset(data_file)
 #run_scatter_plot()
-new = True
+new = False
 #nn_old = create_dmn_from_save("DMN_1406")
 #valid_cost, error_v, error_r = run_validation(nn_old, data)
 #showcase_temp_variation(nn_old)
 
 if new:
-    N_s = 100
-    N = 8
+    N_s = 200
+    N = 6
     mini_batch = 20
-    ind = 1550
-    nn, epoc_cost, epoch_ws = run_train_sample(200, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
+    ind = 15125131
+    nn, epoc_cost, epoch_ws = run_train_sample(2000, mini_batch, ind, N_s, data_file, N=N, inter_plot=True, update_lam=False )
     write_dmn(nn, ind)
     write_data(epoc_cost, epoch_ws, ind)
 else:
-    N_s = 100
+    N_s = 200
     mini_batch = 20
-    ind = 1301
+    ind = 11112
     nn_old = create_dmn_from_save(f"DMN_{ind}")
-    nn, epoc_cost, epoch_zs = run_train_sample(800, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
+    nn, epoc_cost, epoch_zs = run_train_sample(4000, mini_batch, ind+1, N_s, data_file, nn=nn_old, inter_plot=True, update_lam=False)
     write_dmn(nn, ind+1)
     write_data(epoc_cost, epoch_zs, ind+1)
 

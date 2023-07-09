@@ -8,7 +8,7 @@ class Branch:
     """
     def __init__(self, child_1, child_2, theta, inp, w):
         self.bias = 0
-        self.bias_eta = 0.0001
+        self.bias_eta = 0.001
         self.bias_del = []
         self.comp_correct = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
         self.inp = inp
@@ -21,8 +21,8 @@ class Branch:
         self.dC_dtheta_prev = 0
         self.learn_w = 0.01
         self.learn_theta = 0.02
-        self.eta_z = 0.15
-        self.eta_theta = 0.25  # learning rates
+        self.eta_z = 0.1
+        self.eta_theta = 0.1  # learning rates
         self.ch_1 = child_1
         self.ch_2 = child_2
         self.theta = theta
@@ -202,12 +202,11 @@ class Branch:
         N : Layer index
         :return:
         """
-        # gamma = 0.9
-        # self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dW))**2
-        # learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
-        # self.learn_w = np.min([learn, 1.5])
-        eta = self.eta_z
-        dC_dW = np.mean(self.dC_dW)*eta
+        #gamma = 0.975
+        #self.c_z = self.c_z*gamma + (1-gamma)*(np.mean(self.dC_dW))**2
+        #learn = self.eta_z/(np.sqrt(self.c_z) + 1E-6)
+        #self.learn_w = np.min([learn, 1.5])
+        dC_dW = np.mean(self.dC_dW)*self.eta_z
         self.w -= dC_dW
         if self.w <= 0.001:
             self.w = 0.001
@@ -316,7 +315,7 @@ class Network:
                 if i == 0:
                     # output layer
                     delta_new = self.del_C
-                    node.bias_del.append(np.sum(self.del_C))
+                    node.bias_del.append(np.sum(self.del_C*node.D_bar))
                     dC_dW = 0
                     node.dC_dW.append(dC_dW)
                 else:
@@ -329,14 +328,16 @@ class Network:
                         Dr_df = parent_node.Dr_d_f2
                         m += 1
                 node.delta = delta_new
-                node.bias_del.append(np.sum(delta_new))
+                beta = delta_new + delta_new*node.bias
+                node.beta = beta
+                node.bias_del.append(np.sum(node.delta * node.D_bar))
                 alpha = np.zeros((3, 3))
-                alpha[0, 0] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 0])
-                alpha[0, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 1])
-                alpha[0, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 0, 2])
-                alpha[1, 1] = np.sum(delta_new * node.D_d_Dr[:, :, 1, 1])
-                alpha[1, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 1, 2])
-                alpha[2, 2] = np.sum(delta_new * node.D_d_Dr[:, :, 2, 2])
+                alpha[0, 0] = np.sum(beta * node.D_d_Dr[:, :, 0, 0])
+                alpha[0, 1] = np.sum(beta * node.D_d_Dr[:, :, 0, 1])
+                alpha[0, 2] = np.sum(beta * node.D_d_Dr[:, :, 0, 2])
+                alpha[1, 1] = np.sum(beta * node.D_d_Dr[:, :, 1, 1])
+                alpha[1, 2] = np.sum(beta * node.D_d_Dr[:, :, 1, 2])
+                alpha[2, 2] = np.sum(beta * node.D_d_Dr[:, :, 2, 2])
                 node.alpha = alpha
                 if i != 0:
                     if (parent_node.ch_1.w + parent_node.ch_2.w) == 0:
@@ -344,7 +345,8 @@ class Network:
                     else:
                         dC_dW = node.w * np.sum(parent_node.alpha*Dr_df)/(parent_node.ch_1.w + parent_node.ch_2.w)
                         node.dC_dW.append(dC_dW)
-                dC_d_theta = np.sum(delta_new*node.D_d_theta)
+
+                dC_d_theta = np.sum(beta*node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
             prev_layer = layer
         for j, node in enumerate(self.input_layer):
@@ -360,13 +362,14 @@ class Network:
                 else:
                     delta_new = parent_node.calc_delta(False)
                     Dr_df = parent_node.Dr_d_f2
-                node.bias_del.append(np.sum(delta_new))
+                beta = delta_new + delta_new*node.bias
                 node.theta_grad()
                 dC_dW = node.w * np.sum(parent_node.alpha*Dr_df) / (parent_node.ch_1.w + parent_node.ch_2.w)
                 node.dC_dW.append(dC_dW)
-                dC_d_theta = np.sum(delta_new * node.D_d_theta)
+                dC_d_theta = np.sum(beta * node.D_d_theta)
                 node.dC_dTheta.append(dC_d_theta)
                 node.delta = delta_new
+                node.bias_del.append(np.sum(node.delta * node.D_bar))
 
     def learn_step(self):
         for i, node in enumerate(self.input_layer):
